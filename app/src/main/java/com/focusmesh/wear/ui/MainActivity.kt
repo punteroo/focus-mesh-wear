@@ -146,7 +146,6 @@ class MainActivity : ComponentActivity() {
                             onLongPressSkip = viewModel::onSkipPhase,
                             onSelectPreset = viewModel::selectPreset,
                             onSelectRoutineMode = viewModel::setRoutineMode,
-                            onSwapFlexiblePhase = viewModel::onSwapFlexiblePhase,
                             onOpenSettingsFromRightEdge = {
                                 coroutineScope.launch {
                                     pagerState.animateScrollToPage(1)
@@ -157,7 +156,6 @@ class MainActivity : ComponentActivity() {
                         SettingsDrawerScreen(
                             preferences = preferences,
                             isBatterySaverActive = isBatterySaverState,
-                            onSelectRoutineMode = viewModel::setRoutineMode,
                             onSelectPreset = viewModel::selectPreset,
                             onSaveOrUpdatePreset = viewModel::saveOrUpdatePreset,
                             onDeletePreset = viewModel::deletePreset,

@@ -13,6 +13,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
@@ -31,6 +32,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -58,13 +61,10 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.ListHeader
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.RadioButton
 import androidx.wear.compose.material.Scaffold
-import androidx.wear.compose.material.Switch
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.ToggleChip
 import com.focusmesh.wear.R
@@ -78,12 +78,15 @@ import com.focusmesh.wear.ui.mesh.WavePhysicsState
 import com.focusmesh.wear.ui.theme.paletteForTimerState
 import com.focusmesh.wear.ui.theme.resolveGoogleFontFamily
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
-// Renders the uncluttered main timer screen over the full-screen 3D mesh, 2D mesh, or solid background.
-// - Tapping the preset name above the clock opens the native Wear OS Preset Selector for the current mode.
-// - Tapping the central clock starts or pauses the timer.
-// - Swiping left from the right edge (rightmost 16%) opens Settings.
-// - Swiping up from the bottom edge (bottom 18%) opens the Flexible Mode switcher and Work/Break swap controls.
+// Renders the two vertically interchangeable timer screens:
+// - Page 0: Standard Mode timer screen (sequential Work -> Break -> Readiness cycle)
+// - Page 1: Flexible Mode timer screen (dual-pool Work/Break screen with dual concentric bezel rings
+//   and a notable FLEXIBLE mode indicator badge)
+// Pulling down or swiping up vertically swaps between the Standard Mode and Flexible Mode screens.
+// On Flexible Mode, a single tap on the clock pauses/starts like normal, and long-tapping the clock
+// swaps between Active and Break while automatically unpausing the swapped-in timer.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TimerScreen(
@@ -95,16 +98,13 @@ fun TimerScreen(
     onLongPressSkip: () -> Unit,
     onSelectPreset: (RoutineMode, String) -> Unit,
     onSelectRoutineMode: (RoutineMode) -> Unit,
-    onSwapFlexiblePhase: () -> Unit,
     onOpenSettingsFromRightEdge: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showPresetSelector by remember { mutableStateOf(false) }
-    var showFlexibleSheet by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = showPresetSelector || showFlexibleSheet) {
+    BackHandler(enabled = showPresetSelector) {
         showPresetSelector = false
-        showFlexibleSheet = false
     }
 
     if (showPresetSelector && !isAmbient) {
@@ -118,25 +118,76 @@ fun TimerScreen(
         return
     }
 
-    if (showFlexibleSheet && !isAmbient) {
-        NativeFlexibleModeBottomSheet(
-            timerState = timerState,
-            preferences = preferences,
-            onToggleFlexibleMode = { enabled ->
-                onSelectRoutineMode(if (enabled) RoutineMode.FLEXIBLE else RoutineMode.STANDARD)
-            },
-            onSwapPhaseNow = {
-                if (preferences.routineMode != RoutineMode.FLEXIBLE) {
-                    onSelectRoutineMode(RoutineMode.FLEXIBLE)
-                }
-                onSwapFlexiblePhase()
-                showFlexibleSheet = false
-            }
-        )
-        return
+    val coroutineScope = rememberCoroutineScope()
+    val targetPage = if (preferences.routineMode == RoutineMode.FLEXIBLE) 1 else 0
+    val verticalPagerState = rememberPagerState(
+        initialPage = targetPage,
+        pageCount = { 2 }
+    )
+
+    // Keep the vertical pager synchronized if RoutineMode changes externally.
+    LaunchedEffect(targetPage) {
+        if (verticalPagerState.currentPage != targetPage) {
+            verticalPagerState.animateScrollToPage(targetPage)
+        }
     }
 
-    val wavePhysicsState = remember { WavePhysicsState(gridSize = 17) }
+    // Update RoutineMode when vertical page settles on Standard (0) or Flexible (1).
+    LaunchedEffect(verticalPagerState.settledPage) {
+        val settledMode = if (verticalPagerState.settledPage == 1) {
+            RoutineMode.FLEXIBLE
+        } else {
+            RoutineMode.STANDARD
+        }
+        if (settledMode != preferences.routineMode) {
+            onSelectRoutineMode(settledMode)
+        }
+    }
+
+    VerticalPager(
+        state = verticalPagerState,
+        userScrollEnabled = false,
+        modifier = modifier.fillMaxSize()
+    ) { page ->
+        val pageMode = if (page == 1) RoutineMode.FLEXIBLE else RoutineMode.STANDARD
+        ModeTimerPageContent(
+            pageMode = pageMode,
+            timerState = timerState,
+            preferences = preferences,
+            isBatterySaverActive = isBatterySaverActive,
+            isAmbient = isAmbient,
+            onPrimaryTap = onPrimaryTap,
+            onLongPressClock = onLongPressSkip,
+            onOpenPresetSelector = { showPresetSelector = true },
+            onOpenSettingsFromRightEdge = onOpenSettingsFromRightEdge,
+            onVerticalModeSwap = {
+                val nextPage = if (verticalPagerState.currentPage == 0) 1 else 0
+                val nextMode = if (nextPage == 1) RoutineMode.FLEXIBLE else RoutineMode.STANDARD
+                onSelectRoutineMode(nextMode)
+                coroutineScope.launch {
+                    verticalPagerState.animateScrollToPage(nextPage)
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ModeTimerPageContent(
+    pageMode: RoutineMode,
+    timerState: TimerState,
+    preferences: UserPreferences,
+    isBatterySaverActive: Boolean,
+    isAmbient: Boolean,
+    onPrimaryTap: () -> Unit,
+    onLongPressClock: () -> Unit,
+    onOpenPresetSelector: () -> Unit,
+    onOpenSettingsFromRightEdge: () -> Unit,
+    onVerticalModeSwap: () -> Unit
+) {
+    val isFlexibleScreen = pageMode == RoutineMode.FLEXIBLE
+    val wavePhysicsState = remember(pageMode) { WavePhysicsState(gridSize = 17) }
     val fontFamily = remember(preferences.fontChoice) {
         resolveGoogleFontFamily(preferences.fontChoice)
     }
@@ -163,7 +214,7 @@ fun TimerScreen(
     val accentColor = if (isAmbient) targetPalette.primary else animatedAccentColor
 
     var hasInitializedWave by remember { mutableStateOf(false) }
-    LaunchedEffect(timerState.isRunning, timerState.phase) {
+    LaunchedEffect(timerState.isRunning, timerState.phase, pageMode) {
         if (hasInitializedWave && !isAmbient && effectiveBgMode != BackgroundMode.SOLID_COLOR) {
             val pulseIntensity = if (timerState.isRunning) 1.05f else 0.65f
             wavePhysicsState.triggerStateTransitionWave(intensity = pulseIntensity)
@@ -180,8 +231,6 @@ fun TimerScreen(
         label = "timerDigitsScale"
     )
 
-    // Suspend the infinite breathing transition in Ambient Mode so Compose renders a single static
-    // frame on each 1-minute onUpdateAmbient() wakeup without scheduling 60fps choreographer ticks.
     val breathingAlpha = if (isAmbient) {
         1.0f
     } else {
@@ -201,7 +250,6 @@ fun TimerScreen(
     val clockInteractionSource = remember { MutableInteractionSource() }
     val presetInteractionSource = remember { MutableInteractionSource() }
 
-    // Above the timer, show the active preset name instead of the hardcoded "WORK" label.
     val topHeaderLabel = when (timerState.phase) {
         TimerPhase.WORK -> timerState.activePresetName
         TimerPhase.BREAK -> "${timerState.activePresetName} - ${stringResource(R.string.phase_break)}"
@@ -224,19 +272,20 @@ fun TimerScreen(
     }
 
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .pointerInput(isMeshInteractive, isAmbient) {
+            .pointerInput(isMeshInteractive, isAmbient, pageMode) {
                 if (isAmbient) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val startX = down.position.x
                     val startY = down.position.y
                     val startedInRightEdgeZone = size.width > 0 && startX >= size.width * 0.84f
-                    val startedInBottomEdgeZone = size.height > 0 && startY >= size.height * 0.82f
+                    val startedInVerticalEdgeZone = size.height > 0 &&
+                        (startY <= size.height * 0.22f || startY >= size.height * 0.78f)
                     var gestureTriggered = false
 
-                    if (!startedInRightEdgeZone && !startedInBottomEdgeZone && isMeshInteractive && size.width > 0 && size.height > 0) {
+                    if (!startedInRightEdgeZone && !startedInVerticalEdgeZone && isMeshInteractive && size.width > 0 && size.height > 0) {
                         val normX = ((down.position.x / size.width) * 2.0f - 1.0f).coerceIn(-1.0f, 1.0f)
                         val normY = ((down.position.y / size.height) * 2.0f - 1.0f).coerceIn(-1.0f, 1.0f)
                         wavePhysicsState.applyTouchImpulse(normX, normY, strength = 0.58f)
@@ -249,20 +298,20 @@ fun TimerScreen(
                         val pos = change.position
 
                         if (startedInRightEdgeZone) {
-                            // Open Settings when the gesture started on the right edge and dragged left.
                             val totalDx = pos.x - startX
                             if (!gestureTriggered && totalDx < -size.width * 0.14f) {
                                 gestureTriggered = true
                                 change.consume()
                                 onOpenSettingsFromRightEdge()
                             }
-                        } else if (startedInBottomEdgeZone) {
-                            // Open Flexible Mode sheet when the gesture started on the bottom edge and dragged up.
+                        } else if (startedInVerticalEdgeZone) {
+                            // Pulling down or swiping up vertically swaps between Standard Mode and Flexible Mode screens.
                             val totalDy = pos.y - startY
-                            if (!gestureTriggered && totalDy < -size.height * 0.14f) {
+                            val totalDx = pos.x - startX
+                            if (!gestureTriggered && abs(totalDy) > size.height * 0.15f && abs(totalDy) > abs(totalDx)) {
                                 gestureTriggered = true
                                 change.consume()
-                                showFlexibleSheet = true
+                                onVerticalModeSwap()
                             }
                         } else if (isMeshInteractive && size.width > 0 && size.height > 0) {
                             val normX = ((pos.x / size.width) * 2.0f - 1.0f).coerceIn(-1.0f, 1.0f)
@@ -279,6 +328,8 @@ fun TimerScreen(
             isRunning = timerState.isRunning,
             isAwaitingManualContinue = timerState.isAwaitingManualContinue,
             progressFraction = timerState.progressFraction(),
+            isFlexibleMode = isFlexibleScreen,
+            standbyProgressFraction = timerState.standbyProgressFraction(),
             backgroundMode = preferences.backgroundMode,
             isBatterySaverActive = isBatterySaverActive,
             isAmbient = isAmbient,
@@ -301,10 +352,10 @@ fun TimerScreen(
                         interactionSource = presetInteractionSource,
                         indication = null,
                         enabled = !isAmbient,
-                        onClick = { showPresetSelector = true }
+                        onClick = onOpenPresetSelector
                     )
                     .background(
-                        color = if (isAmbient) Color.Transparent else Color.Black.copy(alpha = 0.28f),
+                        color = if (isAmbient) Color.Transparent else Color.Black.copy(alpha = 0.32f),
                         shape = RoundedCornerShape(12.dp)
                     )
                     .padding(horizontal = 10.dp, vertical = 3.dp)
@@ -343,7 +394,10 @@ fun TimerScreen(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Central time readout: only tapping on the clock starts or pauses the timer.
+            // Central time readout:
+            // - Single tap: starts or pauses the timer.
+            // - Long tap: in Flexible Mode, swaps between Active and Break and automatically unpauses;
+            //   in Standard Mode, skips to the next phase.
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -351,7 +405,7 @@ fun TimerScreen(
                         interactionSource = clockInteractionSource,
                         indication = null,
                         onClick = onPrimaryTap,
-                        onLongClick = onLongPressSkip
+                        onLongClick = onLongPressClock
                     )
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
@@ -387,34 +441,52 @@ fun TimerScreen(
                 }
             }
 
-            // In Flexible Mode, render a compact tappable standby pool pill below the clock so the user
-            // can also see the other timer's preserved count and tap to swap between Work and Break.
-            if (!isAmbient &&
-                preferences.routineMode == RoutineMode.FLEXIBLE &&
-                timerState.phase != TimerPhase.READINESS
-            ) {
+            // Notable Flexible Mode indicator badge + standby timer readout shown on the Flexible Mode screen.
+            if (isFlexibleScreen && !isAmbient) {
                 Spacer(modifier = Modifier.height(4.dp))
-                val standbyBadgeText = if (timerState.phase == TimerPhase.WORK) {
+                val standbyColor = if (timerState.phase == TimerPhase.WORK) {
+                    Color(0xFF38D6FF)
+                } else {
+                    Color(0xFFFF4D5A)
+                }
+                val standbyText = if (timerState.phase == TimerPhase.WORK) {
                     stringResource(R.string.flexible_badge_break, timerState.formattedStandbyPoolTime())
                 } else {
                     stringResource(R.string.flexible_badge_work, timerState.formattedStandbyPoolTime())
                 }
-                Box(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                     modifier = Modifier
-                        .clickable { onSwapFlexiblePhase() }
                         .background(
-                            color = Color.White.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(10.dp)
+                            color = Color(0xFF0A0E16).copy(alpha = 0.78f),
+                            shape = RoundedCornerShape(12.dp)
                         )
-                        .padding(horizontal = 9.dp, vertical = 3.dp)
+                        .border(
+                            width = 1.2.dp,
+                            color = standbyColor.copy(alpha = 0.85f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = standbyBadgeText,
+                        text = stringResource(R.string.flexible_mode_indicator),
+                        style = TextStyle(
+                            fontFamily = fontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.2.sp,
+                            color = standbyColor
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = standbyText,
                         style = TextStyle(
                             fontFamily = fontFamily,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.0.sp,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.8.sp,
                             color = Color.White.copy(alpha = 0.92f)
                         )
                     )
@@ -485,84 +557,6 @@ private fun NativeMainScreenPresetSelector(
                     toggleControl = { RadioButton(selected = isSelected) },
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
-        }
-    }
-}
-
-// Native Wear OS Flexible Mode sheet opened by swiping up from the bottom edge of the watch.
-@Composable
-private fun NativeFlexibleModeBottomSheet(
-    timerState: TimerState,
-    preferences: UserPreferences,
-    onToggleFlexibleMode: (Boolean) -> Unit,
-    onSwapPhaseNow: () -> Unit
-) {
-    val listState = rememberScalingLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
-    val isFlexible = preferences.routineMode == RoutineMode.FLEXIBLE
-
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
-    Scaffold(
-        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
-    ) {
-        ScalingLazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF0A0C10))
-                .onRotaryScrollEvent { event ->
-                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
-                    true
-                }
-                .focusRequester(focusRequester)
-                .focusable()
-        ) {
-            item {
-                ListHeader {
-                    Text(text = stringResource(R.string.flexible_sheet_title))
-                }
-            }
-
-            item {
-                ToggleChip(
-                    checked = isFlexible,
-                    onCheckedChange = onToggleFlexibleMode,
-                    label = { Text(text = stringResource(R.string.mode_flexible)) },
-                    secondaryLabel = { Text(text = stringResource(R.string.mode_flexible_desc)) },
-                    toggleControl = { Switch(checked = isFlexible) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            if (timerState.phase != TimerPhase.READINESS) {
-                item {
-                    val swapLabel = if (timerState.phase == TimerPhase.WORK) {
-                        stringResource(
-                            R.string.flexible_swap_to_break,
-                            timerState.formattedStandbyPoolTime()
-                        )
-                    } else {
-                        stringResource(
-                            R.string.flexible_swap_to_work,
-                            timerState.formattedStandbyPoolTime()
-                        )
-                    }
-                    Chip(
-                        onClick = onSwapPhaseNow,
-                        label = {
-                            Text(
-                                text = swapLabel,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        colors = ChipDefaults.primaryChipColors(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
             }
         }
     }

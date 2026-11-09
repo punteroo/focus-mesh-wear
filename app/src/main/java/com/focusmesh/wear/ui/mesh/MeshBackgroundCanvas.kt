@@ -37,6 +37,8 @@ fun MeshBackgroundCanvas(
     isRunning: Boolean,
     isAwaitingManualContinue: Boolean,
     progressFraction: Float,
+    isFlexibleMode: Boolean = false,
+    standbyProgressFraction: Float = 1.0f,
     backgroundMode: BackgroundMode,
     isBatterySaverActive: Boolean,
     isAmbient: Boolean,
@@ -52,6 +54,12 @@ fun MeshBackgroundCanvas(
         isRunning = isRunning,
         isAwaitingManualContinue = isAwaitingManualContinue
     )
+
+    val standbyRingColor = if (phase == TimerPhase.WORK) {
+        Color(0xFF38D6FF)
+    } else {
+        Color(0xFFFF4D5A)
+    }
 
     val primaryColor by animateColorAsState(
         targetValue = targetPalette.primary,
@@ -142,6 +150,30 @@ fun MeshBackgroundCanvas(
                 size = ringSize,
                 style = Stroke(width = if (isRunning) 4.5f else 3.2f, cap = StrokeCap.Round)
             )
+
+            if (isFlexibleMode && phase != TimerPhase.READINESS) {
+                val innerRadius = radius * 0.88f
+                val innerTopLeft = Offset(centerX - innerRadius, centerY - innerRadius)
+                val innerSize = androidx.compose.ui.geometry.Size(innerRadius * 2.0f, innerRadius * 2.0f)
+                drawArc(
+                    color = standbyRingColor.copy(alpha = 0.20f),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = innerTopLeft,
+                    size = innerSize,
+                    style = Stroke(width = 2.4f)
+                )
+                drawArc(
+                    color = standbyRingColor.copy(alpha = 0.85f),
+                    startAngle = -90f,
+                    sweepAngle = (standbyProgressFraction.coerceIn(0.0f, 1.0f) * 360.0f),
+                    useCenter = false,
+                    topLeft = innerTopLeft,
+                    size = innerSize,
+                    style = Stroke(width = 3.0f, cap = StrokeCap.Round)
+                )
+            }
             return@Canvas
         }
 
@@ -154,7 +186,7 @@ fun MeshBackgroundCanvas(
         )
 
         val t = phaseTimeSeconds
-        val tiltRadians = if (mesh3dEnabled) 0.46f else 0.0f
+        val tiltRadians = if (mesh3dEnabled) (if (isFlexibleMode) -0.46f else 0.46f) else 0.0f
         val cosTilt = cos(tiltRadians)
         val sinTilt = sin(tiltRadians)
         val cameraDistance = 2.15f
@@ -300,6 +332,30 @@ fun MeshBackgroundCanvas(
             size = ringSize,
             style = Stroke(width = if (isRunning) 4.5f else 3.2f, cap = StrokeCap.Round)
         )
+
+        if (isFlexibleMode && phase != TimerPhase.READINESS) {
+            val innerRadius = radius * 0.88f
+            val innerTopLeft = Offset(centerX - innerRadius, centerY - innerRadius)
+            val innerSize = androidx.compose.ui.geometry.Size(innerRadius * 2.0f, innerRadius * 2.0f)
+            drawArc(
+                color = standbyRingColor.copy(alpha = 0.22f),
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = innerTopLeft,
+                size = innerSize,
+                style = Stroke(width = 2.4f)
+            )
+            drawArc(
+                color = standbyRingColor.copy(alpha = 0.88f),
+                startAngle = -90f,
+                sweepAngle = (standbyProgressFraction.coerceIn(0.0f, 1.0f) * 360.0f),
+                useCenter = false,
+                topLeft = innerTopLeft,
+                size = innerSize,
+                style = Stroke(width = 3.0f, cap = StrokeCap.Round)
+            )
+        }
     }
 }
 

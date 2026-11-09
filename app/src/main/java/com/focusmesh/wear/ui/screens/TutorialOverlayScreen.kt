@@ -62,7 +62,7 @@ import com.focusmesh.wear.R
 // 1) Swiping left from the right edge to open configurations
 // 2) Tapping the central clock to start/pause (and preset label above it)
 // 3) Official Wear OS watch face complications
-// 4) Swiping up from the bottom edge to use Flexible mode
+// 4) Swiping vertically (up or down) to switch between Standard and Flexible screens, and long-tapping the clock to swap Work and Break
 @Composable
 fun TutorialOverlayScreen(
     onFinishTutorial: () -> Unit,
@@ -114,7 +114,7 @@ fun TutorialOverlayScreen(
                 detectDragGestures { _, dragAmount ->
                     if (currentStep == 0 && dragAmount.x < -18f) {
                         currentStep = 1
-                    } else if (currentStep == 3 && dragAmount.y < -18f) {
+                    } else if (currentStep == 3 && kotlin.math.abs(dragAmount.y) > 18f) {
                         onFinishTutorial()
                     }
                 }
@@ -371,37 +371,37 @@ private fun DrawScope.drawComplicationDemo(progress: Float) {
     )
 }
 
-// Step 4 vector illustration: Watch bezel with highlighted bottom edge and upward swipe hand icon for Flexible Mode.
+// Step 4 vector illustration: Dual concentric bezel rings with vertical up/down swipe arrow for Flexible Mode.
 private fun DrawScope.drawBottomSwipeFlexibleDemo(progress: Float) {
     val center = Offset(size.width * 0.5f, size.height * 0.5f)
     val radius = size.minDimension * 0.44f
+    val innerRadius = radius * 0.82f
 
+    // Outer active bezel ring (Warm Coral).
     drawCircle(
-        color = Color.White.copy(alpha = 0.22f),
+        color = Color(0xFFFF4D5A).copy(alpha = 0.55f),
         radius = radius,
         center = center,
-        style = Stroke(width = 2.dp.toPx())
+        style = Stroke(width = 2.2.dp.toPx())
     )
 
-    // Glowing bottom-edge arc for Flexible mode swipe.
-    drawArc(
-        color = Color(0xFF38D6FF),
-        startAngle = 48f,
-        sweepAngle = 84f,
-        useCenter = false,
-        topLeft = Offset(center.x - radius, center.y - radius),
-        size = Size(radius * 2f, radius * 2f),
-        style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+    // Inner standby pool concentric ring (Cool Cyan) distinctive to Flexible Mode.
+    drawCircle(
+        color = Color(0xFF38D6FF).copy(alpha = 0.65f),
+        radius = innerRadius,
+        center = center,
+        style = Stroke(width = 1.8.dp.toPx())
     )
 
-    val startY = center.y + radius * 0.82f
-    val endY = center.y - radius * 0.18f
-    val handY = startY + (endY - startY) * progress
+    val topY = center.y - radius * 0.65f
+    val bottomY = center.y + radius * 0.65f
+    val wave = kotlin.math.sin(progress * Math.PI.toFloat())
+    val handY = topY + (bottomY - topY) * wave
 
     drawVerticalUpArrow(
         x = center.x - 8.dp.toPx(),
-        fromY = startY,
-        toY = handY,
+        fromY = bottomY,
+        toY = topY,
         color = Color(0xFFFF6D1A)
     )
 

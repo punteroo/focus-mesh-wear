@@ -74,7 +74,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private sealed interface SettingsSubScreen {
-    data object ModeSelector : SettingsSubScreen
     data class ModePresetsList(val mode: RoutineMode) : SettingsSubScreen
     data class EditPreset(val preset: TimerPreset) : SettingsSubScreen
     data class EditPresetWorkDuration(val preset: TimerPreset) : SettingsSubScreen
@@ -93,7 +92,6 @@ private sealed interface SettingsSubScreen {
 fun SettingsDrawerScreen(
     preferences: UserPreferences,
     isBatterySaverActive: Boolean,
-    onSelectRoutineMode: (RoutineMode) -> Unit,
     onSelectPreset: (RoutineMode, String) -> Unit,
     onSaveOrUpdatePreset: (TimerPreset) -> Unit,
     onDeletePreset: (RoutineMode, String) -> Unit,
@@ -125,16 +123,6 @@ fun SettingsDrawerScreen(
     }
 
     when (val sub = activeSubScreen) {
-        SettingsSubScreen.ModeSelector -> {
-            NativeRoutineModeSelectorScreen(
-                selectedMode = preferences.routineMode,
-                onSelectMode = {
-                    onSelectRoutineMode(it)
-                    activeSubScreen = null
-                }
-            )
-            return
-        }
         is SettingsSubScreen.ModePresetsList -> {
             NativeModePresetsListScreen(
                 mode = sub.mode,
@@ -285,11 +273,6 @@ fun SettingsDrawerScreen(
         resolveGoogleFontFamily(preferences.fontChoice)
     }
 
-    val routineModeLabel = when (preferences.routineMode) {
-        RoutineMode.STANDARD -> stringResource(R.string.mode_standard)
-        RoutineMode.FLEXIBLE -> stringResource(R.string.mode_flexible)
-    }
-
     val activeStandardPreset = preferences.activePresetForMode(RoutineMode.STANDARD)
     val activeFlexiblePreset = preferences.activePresetForMode(RoutineMode.FLEXIBLE)
 
@@ -336,17 +319,6 @@ fun SettingsDrawerScreen(
                 ListHeader {
                     Text(text = stringResource(R.string.settings_title))
                 }
-            }
-
-            // Active Timer Mode selector (Standard vs Flexible).
-            item {
-                Chip(
-                    onClick = { activeSubScreen = SettingsSubScreen.ModeSelector },
-                    label = { Text(text = stringResource(R.string.settings_routine_mode)) },
-                    secondaryLabel = { Text(text = routineModeLabel) },
-                    colors = ChipDefaults.secondaryChipColors(),
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
 
             // Sub-section to configure Standard Mode presets (default: Work 60m active - 15m break).
@@ -610,60 +582,6 @@ fun SettingsDrawerScreen(
                     onClick = onResetPhase,
                     label = { Text(text = stringResource(R.string.settings_reset_timer)) },
                     colors = ChipDefaults.secondaryChipColors(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-// Native Wear OS Radio Selector for RoutineMode (Standard vs Flexible).
-@Composable
-private fun NativeRoutineModeSelectorScreen(
-    selectedMode: RoutineMode,
-    onSelectMode: (RoutineMode) -> Unit
-) {
-    val listState = rememberScalingLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
-    Scaffold(
-        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
-    ) {
-        ScalingLazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .onRotaryScrollEvent { event ->
-                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
-                    true
-                }
-                .focusRequester(focusRequester)
-                .focusable()
-        ) {
-            item {
-                ListHeader {
-                    Text(text = stringResource(R.string.settings_routine_mode))
-                }
-            }
-            items(RoutineMode.entries) { mode ->
-                val label = when (mode) {
-                    RoutineMode.STANDARD -> stringResource(R.string.mode_standard)
-                    RoutineMode.FLEXIBLE -> stringResource(R.string.mode_flexible)
-                }
-                val desc = when (mode) {
-                    RoutineMode.STANDARD -> stringResource(R.string.mode_standard_desc)
-                    RoutineMode.FLEXIBLE -> stringResource(R.string.mode_flexible_desc)
-                }
-                val isSelected = mode == selectedMode
-                ToggleChip(
-                    checked = isSelected,
-                    onCheckedChange = { onSelectMode(mode) },
-                    label = { Text(text = label) },
-                    secondaryLabel = { Text(text = desc, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    toggleControl = { RadioButton(selected = isSelected) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
