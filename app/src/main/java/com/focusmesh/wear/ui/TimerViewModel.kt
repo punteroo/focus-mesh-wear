@@ -9,7 +9,9 @@ import com.focusmesh.wear.data.PreferencesRepository
 import com.focusmesh.wear.domain.model.AlertMode
 import com.focusmesh.wear.domain.model.BackgroundMode
 import com.focusmesh.wear.domain.model.FontChoice
+import com.focusmesh.wear.domain.model.RoutineMode
 import com.focusmesh.wear.domain.model.SoundOption
+import com.focusmesh.wear.domain.model.TimerPreset
 import com.focusmesh.wear.domain.model.TimerState
 import com.focusmesh.wear.domain.model.UserPreferences
 import com.focusmesh.wear.service.TimerForegroundService
@@ -30,7 +32,7 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
     val preferences: StateFlow<UserPreferences> = preferencesRepository.preferencesFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000L),
-        initialValue = UserPreferences()
+        initialValue = UserPreferences(hasCompletedTutorial = true)
     )
 
     // Dispatches a toggle or manual-continue command to the foreground service.
@@ -39,13 +41,19 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         sendServiceAction(TimerForegroundService.ACTION_TOGGLE_OR_CONTINUE)
     }
 
-    // Skips immediately to the next phase in the Work -> Break -> Readiness loop.
+    // Skips to the next phase in Standard mode or swaps Work/Break in Flexible mode.
     fun onSkipPhase() {
         alertController.stopActiveSound()
         sendServiceAction(TimerForegroundService.ACTION_SKIP_PHASE)
     }
 
-    // Resets the current phase timer to its full configured duration.
+    // Explicitly swaps between Work and Break while preserving remaining pool counts in Flexible mode.
+    fun onSwapFlexiblePhase() {
+        alertController.stopActiveSound()
+        sendServiceAction(TimerForegroundService.ACTION_SWAP_FLEXIBLE_PHASE)
+    }
+
+    // Resets the current preset timers to their full configured durations.
     fun onResetPhase() {
         alertController.stopActiveSound()
         sendServiceAction(TimerForegroundService.ACTION_RESET_PHASE)
@@ -57,6 +65,30 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         TimerForegroundService.refreshRemainingTimeFromClock()
         if (timerState.value.isRunning) {
             sendServiceAction(TimerForegroundService.ACTION_AMBIENT_UPDATE)
+        }
+    }
+
+    fun setRoutineMode(mode: RoutineMode) {
+        viewModelScope.launch {
+            preferencesRepository.setRoutineMode(mode)
+        }
+    }
+
+    fun selectPreset(mode: RoutineMode, presetId: String) {
+        viewModelScope.launch {
+            preferencesRepository.selectPreset(mode, presetId)
+        }
+    }
+
+    fun saveOrUpdatePreset(preset: TimerPreset) {
+        viewModelScope.launch {
+            preferencesRepository.saveOrUpdatePreset(preset, makeActive = true)
+        }
+    }
+
+    fun deletePreset(mode: RoutineMode, presetId: String) {
+        viewModelScope.launch {
+            preferencesRepository.deletePreset(mode, presetId)
         }
     }
 
@@ -81,18 +113,6 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
     fun setReadinessGraceEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setReadinessGraceEnabled(enabled)
-        }
-    }
-
-    fun setWorkDurationSeconds(totalSeconds: Int) {
-        viewModelScope.launch {
-            preferencesRepository.setWorkDurationSeconds(totalSeconds.coerceAtLeast(1))
-        }
-    }
-
-    fun setBreakDurationSeconds(totalSeconds: Int) {
-        viewModelScope.launch {
-            preferencesRepository.setBreakDurationSeconds(totalSeconds.coerceAtLeast(1))
         }
     }
 
@@ -125,6 +145,12 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         val clamped = volume.coerceIn(0.0f, 1.0f)
         viewModelScope.launch {
             preferencesRepository.setAlertVolume(clamped)
+        }
+    }
+
+    fun setHasCompletedTutorial(completed: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setHasCompletedTutorial(completed)
         }
     }
 

@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -31,11 +32,11 @@ import androidx.wear.ambient.AmbientLifecycleObserver
 import androidx.wear.compose.material.MaterialTheme
 import com.focusmesh.wear.ui.screens.SettingsDrawerScreen
 import com.focusmesh.wear.ui.screens.TimerScreen
+import com.focusmesh.wear.ui.screens.TutorialOverlayScreen
 import kotlinx.coroutines.launch
 
-// Entry activity hosting the uncluttered timer canvas (Page 0) and right-side configuration drawer (Page 1).
-// Observes both Wear OS Ambient Mode and Android Battery Saver state so mesh rendering drops to a solid
-// background automatically when Battery Saver is active.
+// Entry activity hosting the uncluttered timer canvas (Page 0), right-side configuration drawer (Page 1),
+// and the interactive 4-step vector tutorial overlay.
 class MainActivity : ComponentActivity() {
 
     private val viewModel: TimerViewModel by viewModels()
@@ -96,11 +97,23 @@ class MainActivity : ComponentActivity() {
                 val timerState by viewModel.timerState.collectAsState()
                 val preferences by viewModel.preferences.collectAsState()
                 val coroutineScope = rememberCoroutineScope()
+                var manualTutorialOpen by remember { mutableStateOf(false) }
 
                 val pagerState = rememberPagerState(
                     initialPage = 0,
                     pageCount = { 2 }
                 )
+
+                // Show the interactive 4-step tutorial on first launch or whenever re-opened from Settings.
+                if ((!preferences.hasCompletedTutorial || manualTutorialOpen) && !isAmbientState) {
+                    TutorialOverlayScreen(
+                        onFinishTutorial = {
+                            manualTutorialOpen = false
+                            viewModel.setHasCompletedTutorial(true)
+                        }
+                    )
+                    return@MaterialTheme
+                }
 
                 // Stop any active sound preview when returning from the settings drawer to the main timer.
                 LaunchedEffect(pagerState.currentPage) {
@@ -131,6 +144,9 @@ class MainActivity : ComponentActivity() {
                             isAmbient = isAmbientState,
                             onPrimaryTap = viewModel::onPrimaryAction,
                             onLongPressSkip = viewModel::onSkipPhase,
+                            onSelectPreset = viewModel::selectPreset,
+                            onSelectRoutineMode = viewModel::setRoutineMode,
+                            onSwapFlexiblePhase = viewModel::onSwapFlexiblePhase,
                             onOpenSettingsFromRightEdge = {
                                 coroutineScope.launch {
                                     pagerState.animateScrollToPage(1)
@@ -141,12 +157,15 @@ class MainActivity : ComponentActivity() {
                         SettingsDrawerScreen(
                             preferences = preferences,
                             isBatterySaverActive = isBatterySaverState,
+                            onSelectRoutineMode = viewModel::setRoutineMode,
+                            onSelectPreset = viewModel::selectPreset,
+                            onSaveOrUpdatePreset = viewModel::saveOrUpdatePreset,
+                            onDeletePreset = viewModel::deletePreset,
+                            onOpenTutorial = { manualTutorialOpen = true },
                             onSelectBackgroundMode = viewModel::setBackgroundMode,
                             onToggleTouchWave = viewModel::setTouchWaveEnabled,
                             onToggleOngoingPill = viewModel::setOngoingPillEnabled,
                             onToggleReadinessGrace = viewModel::setReadinessGraceEnabled,
-                            onSaveWorkDurationSeconds = viewModel::setWorkDurationSeconds,
-                            onSaveBreakDurationSeconds = viewModel::setBreakDurationSeconds,
                             onSaveGraceDurationSeconds = viewModel::setReadinessGraceSeconds,
                             onSelectFontChoice = viewModel::setFontChoice,
                             onSelectAlertMode = viewModel::setAlertMode,

@@ -1,6 +1,12 @@
 package com.focusmesh.wear.ui.screens
 
+import android.app.Activity
+import android.app.RemoteInput
+import android.content.Intent
+import android.os.Bundle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -59,15 +65,20 @@ import com.focusmesh.wear.R
 import com.focusmesh.wear.domain.model.AlertMode
 import com.focusmesh.wear.domain.model.BackgroundMode
 import com.focusmesh.wear.domain.model.FontChoice
+import com.focusmesh.wear.domain.model.RoutineMode
 import com.focusmesh.wear.domain.model.SoundOption
+import com.focusmesh.wear.domain.model.TimerPreset
 import com.focusmesh.wear.domain.model.UserPreferences
 import com.focusmesh.wear.ui.theme.resolveGoogleFontFamily
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private sealed interface SettingsSubScreen {
-    data object WorkDuration : SettingsSubScreen
-    data object BreakDuration : SettingsSubScreen
+    data object ModeSelector : SettingsSubScreen
+    data class ModePresetsList(val mode: RoutineMode) : SettingsSubScreen
+    data class EditPreset(val preset: TimerPreset) : SettingsSubScreen
+    data class EditPresetWorkDuration(val preset: TimerPreset) : SettingsSubScreen
+    data class EditPresetBreakDuration(val preset: TimerPreset) : SettingsSubScreen
     data object GraceDuration : SettingsSubScreen
     data object BackgroundSelector : SettingsSubScreen
     data object FontSelector : SettingsSubScreen
@@ -77,17 +88,20 @@ private sealed interface SettingsSubScreen {
 
 // Native Wear OS configuration drawer using official Wear Compose Material primitives:
 // ScalingLazyColumn with rotary bezel scroll, ListHeader, Chip, ToggleChip with Switch/RadioButton,
-// InlineSlider with InlineSliderDefaults icons, and native 3-column Picker with circular Buttons.
+// InlineSlider with InlineSliderDefaults icons, per-mode Preset management, and native 3-column Picker.
 @Composable
 fun SettingsDrawerScreen(
     preferences: UserPreferences,
     isBatterySaverActive: Boolean,
+    onSelectRoutineMode: (RoutineMode) -> Unit,
+    onSelectPreset: (RoutineMode, String) -> Unit,
+    onSaveOrUpdatePreset: (TimerPreset) -> Unit,
+    onDeletePreset: (RoutineMode, String) -> Unit,
+    onOpenTutorial: () -> Unit,
     onSelectBackgroundMode: (BackgroundMode) -> Unit,
     onToggleTouchWave: (Boolean) -> Unit,
     onToggleOngoingPill: (Boolean) -> Unit,
     onToggleReadinessGrace: (Boolean) -> Unit,
-    onSaveWorkDurationSeconds: (Int) -> Unit,
-    onSaveBreakDurationSeconds: (Int) -> Unit,
     onSaveGraceDurationSeconds: (Int) -> Unit,
     onSelectFontChoice: (FontChoice) -> Unit,
     onSelectAlertMode: (AlertMode) -> Unit,
@@ -100,33 +114,110 @@ fun SettingsDrawerScreen(
 ) {
     var activeSubScreen by remember { mutableStateOf<SettingsSubScreen?>(null) }
 
-    // Intercept Back gesture when a native sub-menu or picker is open to return to the main Settings list.
+    // Navigate back hierarchically through sub-screens using Wear OS Back gesture.
     BackHandler(enabled = activeSubScreen != null) {
-        activeSubScreen = null
+        activeSubScreen = when (val current = activeSubScreen) {
+            is SettingsSubScreen.EditPresetWorkDuration -> SettingsSubScreen.EditPreset(current.preset)
+            is SettingsSubScreen.EditPresetBreakDuration -> SettingsSubScreen.EditPreset(current.preset)
+            is SettingsSubScreen.EditPreset -> SettingsSubScreen.ModePresetsList(current.preset.mode)
+            else -> null
+        }
     }
 
-    when (activeSubScreen) {
-        SettingsSubScreen.WorkDuration -> {
-            HmsDurationPickerOverlay(
-                title = stringResource(R.string.settings_work_duration),
-                initialTotalSeconds = preferences.workDurationSeconds,
-                onConfirmSeconds = {
-                    onSaveWorkDurationSeconds(it)
+    when (val sub = activeSubScreen) {
+        SettingsSubScreen.ModeSelector -> {
+            NativeRoutineModeSelectorScreen(
+                selectedMode = preferences.routineMode,
+                onSelectMode = {
+                    onSelectRoutineMode(it)
                     activeSubScreen = null
-                },
-                onCancel = { activeSubScreen = null }
+                }
             )
             return
         }
-        SettingsSubScreen.BreakDuration -> {
-            HmsDurationPickerOverlay(
-                title = stringResource(R.string.settings_break_duration),
-                initialTotalSeconds = preferences.breakDurationSeconds,
-                onConfirmSeconds = {
-                    onSaveBreakDurationSeconds(it)
+        is SettingsSubScreen.ModePresetsList -> {
+            NativeModePresetsListScreen(
+                mode = sub.mode,
+                preferences = preferences,
+                onOpenPresetEditor = { preset ->
+                    activeSubScreen = SettingsSubScreen.EditPreset(preset)
+                },
+                onCreateNewPreset = {
+                    val existingCount = preferences.presetsForMode(sub.mode).size
+                    val defaultWork = if (sub.mode == RoutineMode.STANDARD) 3600 else 7200
+                    val defaultBreak = if (sub.mode == RoutineMode.STANDARD) 900 else 2700
+                    val newPreset = TimerPreset(
+                        id = "preset_${sub.mode.name.lowercase()}_${System.currentTimeMillis()}",
+                        mode = sub.mode,
+                        name = TimerPreset.sanitizeName("Focus ${existingCount + 1}"),
+                        workDurationSeconds = defaultWork,
+                        breakDurationSeconds = defaultBreak,
+                        isDefault = false
+                    )
+                    onSaveOrUpdatePreset(newPreset)
+                    activeSubScreen = SettingsSubScreen.EditPreset(newPreset)
+                }
+            )
+            return
+        }
+        is SettingsSubScreen.EditPreset -> {
+            val latestPreset = preferences.presetsForMode(sub.preset.mode)
+                .firstOrNull { it.id == sub.preset.id } ?: sub.preset
+            val isCurrentlyActive = preferences.activePresetForMode(sub.preset.mode).id == latestPreset.id
+            NativePresetEditorScreen(
+                preset = latestPreset,
+                isActiveInMode = isCurrentlyActive,
+                onUsePreset = {
+                    onSelectPreset(latestPreset.mode, latestPreset.id)
                     activeSubScreen = null
                 },
-                onCancel = { activeSubScreen = null }
+                onRenamePreset = { newName ->
+                    val updated = latestPreset.copy(name = TimerPreset.sanitizeName(newName))
+                    onSaveOrUpdatePreset(updated)
+                    activeSubScreen = SettingsSubScreen.EditPreset(updated)
+                },
+                onEditWorkDuration = {
+                    activeSubScreen = SettingsSubScreen.EditPresetWorkDuration(latestPreset)
+                },
+                onEditBreakDuration = {
+                    activeSubScreen = SettingsSubScreen.EditPresetBreakDuration(latestPreset)
+                },
+                onDeletePreset = {
+                    if (!latestPreset.isDefault) {
+                        onDeletePreset(latestPreset.mode, latestPreset.id)
+                        activeSubScreen = SettingsSubScreen.ModePresetsList(latestPreset.mode)
+                    }
+                }
+            )
+            return
+        }
+        is SettingsSubScreen.EditPresetWorkDuration -> {
+            HmsDurationPickerOverlay(
+                title = stringResource(R.string.settings_work_duration),
+                initialTotalSeconds = sub.preset.workDurationSeconds,
+                onConfirmSeconds = { seconds ->
+                    val updated = sub.preset.copy(workDurationSeconds = seconds)
+                    onSaveOrUpdatePreset(updated)
+                    activeSubScreen = SettingsSubScreen.EditPreset(updated)
+                },
+                onCancel = {
+                    activeSubScreen = SettingsSubScreen.EditPreset(sub.preset)
+                }
+            )
+            return
+        }
+        is SettingsSubScreen.EditPresetBreakDuration -> {
+            HmsDurationPickerOverlay(
+                title = stringResource(R.string.settings_break_duration),
+                initialTotalSeconds = sub.preset.breakDurationSeconds,
+                onConfirmSeconds = { seconds ->
+                    val updated = sub.preset.copy(breakDurationSeconds = seconds)
+                    onSaveOrUpdatePreset(updated)
+                    activeSubScreen = SettingsSubScreen.EditPreset(updated)
+                },
+                onCancel = {
+                    activeSubScreen = SettingsSubScreen.EditPreset(sub.preset)
+                }
             )
             return
         }
@@ -194,6 +285,14 @@ fun SettingsDrawerScreen(
         resolveGoogleFontFamily(preferences.fontChoice)
     }
 
+    val routineModeLabel = when (preferences.routineMode) {
+        RoutineMode.STANDARD -> stringResource(R.string.mode_standard)
+        RoutineMode.FLEXIBLE -> stringResource(R.string.mode_flexible)
+    }
+
+    val activeStandardPreset = preferences.activePresetForMode(RoutineMode.STANDARD)
+    val activeFlexiblePreset = preferences.activePresetForMode(RoutineMode.FLEXIBLE)
+
     val bgModeLabel = when (preferences.backgroundMode) {
         BackgroundMode.MESH_3D -> stringResource(R.string.bg_mode_3d)
         BackgroundMode.MESH_2D -> stringResource(R.string.bg_mode_2d)
@@ -239,26 +338,59 @@ fun SettingsDrawerScreen(
                 }
             }
 
-            // Custom Work Duration (Hour : Minute : Second granularity).
+            // Active Timer Mode selector (Standard vs Flexible).
             item {
                 Chip(
-                    onClick = { activeSubScreen = SettingsSubScreen.WorkDuration },
-                    label = { Text(text = stringResource(R.string.settings_work_duration)) },
+                    onClick = { activeSubScreen = SettingsSubScreen.ModeSelector },
+                    label = { Text(text = stringResource(R.string.settings_routine_mode)) },
+                    secondaryLabel = { Text(text = routineModeLabel) },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Sub-section to configure Standard Mode presets (default: Work 60m active - 15m break).
+            item {
+                val stdSummary = "${activeStandardPreset.name}: " + stringResource(
+                    R.string.preset_summary_format,
+                    UserPreferences.formatCompactDuration(activeStandardPreset.workDurationSeconds),
+                    UserPreferences.formatCompactDuration(activeStandardPreset.breakDurationSeconds)
+                )
+                Chip(
+                    onClick = {
+                        activeSubScreen = SettingsSubScreen.ModePresetsList(RoutineMode.STANDARD)
+                    },
+                    label = { Text(text = stringResource(R.string.settings_standard_presets)) },
                     secondaryLabel = {
-                        Text(text = UserPreferences.formatSecondsAsHms(preferences.workDurationSeconds))
+                        Text(
+                            text = stdSummary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     },
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            // Custom Break Duration (Hour : Minute : Second granularity).
+            // Sub-section to configure Flexible Mode presets (default: Work 120m active - 45m break).
             item {
+                val flexSummary = "${activeFlexiblePreset.name}: " + stringResource(
+                    R.string.preset_summary_format,
+                    UserPreferences.formatCompactDuration(activeFlexiblePreset.workDurationSeconds),
+                    UserPreferences.formatCompactDuration(activeFlexiblePreset.breakDurationSeconds)
+                )
                 Chip(
-                    onClick = { activeSubScreen = SettingsSubScreen.BreakDuration },
-                    label = { Text(text = stringResource(R.string.settings_break_duration)) },
+                    onClick = {
+                        activeSubScreen = SettingsSubScreen.ModePresetsList(RoutineMode.FLEXIBLE)
+                    },
+                    label = { Text(text = stringResource(R.string.settings_flexible_presets)) },
                     secondaryLabel = {
-                        Text(text = UserPreferences.formatSecondsAsHms(preferences.breakDurationSeconds))
+                        Text(
+                            text = flexSummary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     },
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
@@ -296,8 +428,7 @@ fun SettingsDrawerScreen(
                 }
             }
 
-            // Toggle for the bottom Watch Face OngoingActivity pill ("Now" indicator), allowing users to
-            // choose either the bottom pill, the native Watch Face Complication, or both.
+            // Toggle for the bottom Watch Face OngoingActivity pill ("Now" indicator).
             item {
                 ToggleChip(
                     checked = preferences.ongoingPillEnabled,
@@ -454,6 +585,16 @@ fun SettingsDrawerScreen(
                 )
             }
 
+            // Re-openable Interactive Tutorial button.
+            item {
+                Chip(
+                    onClick = onOpenTutorial,
+                    label = { Text(text = stringResource(R.string.settings_open_tutorial)) },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             // Phase control shortcuts.
             item {
                 Chip(
@@ -471,6 +612,292 @@ fun SettingsDrawerScreen(
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+        }
+    }
+}
+
+// Native Wear OS Radio Selector for RoutineMode (Standard vs Flexible).
+@Composable
+private fun NativeRoutineModeSelectorScreen(
+    selectedMode: RoutineMode,
+    onSelectMode: (RoutineMode) -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.settings_routine_mode))
+                }
+            }
+            items(RoutineMode.entries) { mode ->
+                val label = when (mode) {
+                    RoutineMode.STANDARD -> stringResource(R.string.mode_standard)
+                    RoutineMode.FLEXIBLE -> stringResource(R.string.mode_flexible)
+                }
+                val desc = when (mode) {
+                    RoutineMode.STANDARD -> stringResource(R.string.mode_standard_desc)
+                    RoutineMode.FLEXIBLE -> stringResource(R.string.mode_flexible_desc)
+                }
+                val isSelected = mode == selectedMode
+                ToggleChip(
+                    checked = isSelected,
+                    onCheckedChange = { onSelectMode(mode) },
+                    label = { Text(text = label) },
+                    secondaryLabel = { Text(text = desc, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    toggleControl = { RadioButton(selected = isSelected) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+// Native Wear OS list of presets for a specific mode (Standard or Flexible) with "+ New Preset".
+@Composable
+private fun NativeModePresetsListScreen(
+    mode: RoutineMode,
+    preferences: UserPreferences,
+    onOpenPresetEditor: (TimerPreset) -> Unit,
+    onCreateNewPreset: () -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    val presets = preferences.presetsForMode(mode)
+    val activePresetId = preferences.activePresetForMode(mode).id
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    val headerTitle = if (mode == RoutineMode.STANDARD) {
+        stringResource(R.string.settings_standard_presets)
+    } else {
+        stringResource(R.string.settings_flexible_presets)
+    }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = headerTitle)
+                }
+            }
+            items(presets, key = { it.id }) { preset ->
+                val isActive = preset.id == activePresetId
+                val summary = stringResource(
+                    R.string.preset_summary_format,
+                    UserPreferences.formatCompactDuration(preset.workDurationSeconds),
+                    UserPreferences.formatCompactDuration(preset.breakDurationSeconds)
+                )
+                Chip(
+                    onClick = { onOpenPresetEditor(preset) },
+                    label = {
+                        Text(
+                            text = if (isActive) "* ${preset.name}" else preset.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    secondaryLabel = {
+                        Text(
+                            text = summary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = if (isActive) {
+                        ChipDefaults.primaryChipColors()
+                    } else {
+                        ChipDefaults.secondaryChipColors()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Chip(
+                    onClick = onCreateNewPreset,
+                    label = { Text(text = stringResource(R.string.preset_add_new)) },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+// Native Wear OS Preset Editor Screen supporting custom name input (max 16 chars, [A-Za-z0-9 -_]),
+// HH:MM:SS Work/Break duration pickers, active selection, and deletion of non-default presets.
+@Composable
+private fun NativePresetEditorScreen(
+    preset: TimerPreset,
+    isActiveInMode: Boolean,
+    onUsePreset: () -> Unit,
+    onRenamePreset: (String) -> Unit,
+    onEditWorkDuration: () -> Unit,
+    onEditBreakDuration: () -> Unit,
+    onDeletePreset: () -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    val remoteInputKey = "preset_custom_name_input"
+    val remoteInputTitle = stringResource(R.string.preset_name_label)
+
+    val remoteInputLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val resultsBundle: Bundle? = if (data != null) {
+                RemoteInput.getResultsFromIntent(data)
+            } else {
+                null
+            }
+            val rawText = resultsBundle?.getCharSequence(remoteInputKey)?.toString()
+            if (!rawText.isNullOrBlank()) {
+                onRenamePreset(TimerPreset.sanitizeName(rawText, fallback = preset.name))
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.preset_edit_title))
+                }
+            }
+
+            item {
+                ToggleChip(
+                    checked = isActiveInMode,
+                    onCheckedChange = { onUsePreset() },
+                    label = { Text(text = stringResource(R.string.preset_use_now)) },
+                    toggleControl = { RadioButton(selected = isActiveInMode) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Custom name input using native Wear OS RemoteInput keyboard/voice input.
+            item {
+                Chip(
+                    onClick = {
+                        val remoteInput = RemoteInput.Builder(remoteInputKey)
+                            .setLabel(remoteInputTitle)
+                            .build()
+                        val intent = Intent("android.support.wearable.input.action.REMOTE_INPUT").apply {
+                            putExtra(
+                                "android.support.wearable.input.extra.REMOTE_INPUTS",
+                                arrayOf(remoteInput)
+                            )
+                            putExtra("android.support.wearable.input.extra.TITLE", remoteInputTitle)
+                        }
+                        runCatching {
+                            remoteInputLauncher.launch(intent)
+                        }
+                    },
+                    label = { Text(text = stringResource(R.string.preset_name_label)) },
+                    secondaryLabel = {
+                        Text(
+                            text = preset.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Chip(
+                    onClick = onEditWorkDuration,
+                    label = { Text(text = stringResource(R.string.settings_work_duration)) },
+                    secondaryLabel = {
+                        Text(text = UserPreferences.formatSecondsAsHms(preset.workDurationSeconds))
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Chip(
+                    onClick = onEditBreakDuration,
+                    label = { Text(text = stringResource(R.string.settings_break_duration)) },
+                    secondaryLabel = {
+                        Text(text = UserPreferences.formatSecondsAsHms(preset.breakDurationSeconds))
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Default presets cannot be deleted; user-created presets show the native Delete Chip.
+            if (!preset.isDefault) {
+                item {
+                    Chip(
+                        onClick = onDeletePreset,
+                        label = { Text(text = stringResource(R.string.preset_delete)) },
+                        colors = ChipDefaults.secondaryChipColors(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            } else {
+                item {
+                    Chip(
+                        onClick = {},
+                        enabled = false,
+                        label = { Text(text = stringResource(R.string.preset_default_badge)) },
+                        colors = ChipDefaults.secondaryChipColors(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
