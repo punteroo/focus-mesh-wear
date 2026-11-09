@@ -45,13 +45,21 @@ To guarantee exact phase completion alerts:
 3. When the alarm fires, `TimerAlarmReceiver` acquires a brief partial wake lock and notifies `TimerForegroundService` to transition the phase and invoke `AlertController.triggerPhaseAlert()`.
 4. `AlertController` plays audio using `AudioAttributes.USAGE_ALARM` and triggers vibration using `VibrationAttributes.USAGE_ALARM`, both of which are exempted from Do Not Disturb suppression by Android's notification policy service.
 
-## 5. One UI Watch Island (`OngoingActivity`)
+## 5. Native Watch Face Complication & Optional Ongoing Pill (`OngoingActivity`)
 
-Samsung One UI Watch 6 surfaces active background tasks as an animated pill ("island") on the watch face when an app registers an `OngoingActivity` attached to an active foreground notification:
-- `TimerForegroundService` builds a `Status.Builder()` containing a `StopwatchPart` or `TimerPart` (`Status.TimerPart(timeZeroMillis)`) and attaches it to `OngoingActivity.Builder(context, NOTIFICATION_ID, notificationBuilder)`.
-- Calling `ongoingActivity.apply(context)` registers the timer with the Wear OS launcher so the user can see remaining time on their watch face and return to FocusMesh with a single tap.
+FocusMesh supports two independent ways to display the timer on the watch face so the user can choose either a native complication slot, the bottom "Now" pill, or both:
+- **Native Wear OS Complication (`FocusTimerComplicationService`)**:
+  - Extends `SuspendingComplicationDataSourceService` and supports `RANGED_VALUE` (circular progress gauge slots), `SHORT_TEXT` (compact circle or bezel slots), and `LONG_TEXT` (wide banner slots).
+  - While the timer is running, it supplies a `TimeDifferenceComplicationText` with `TimeDifferenceStyle.STOPWATCH` and `CountDownTimeReference(targetInstant)` so the watch face natively renders a live-ticking countdown in its own typography without waking the app every second.
+  - Whenever the timer starts, pauses, resets, or transitions phases, `FocusTimerComplicationService.requestComplicationUpdate(context)` pushes an immediate update to all active complication slots.
+- **Optional Bottom Watch Face Pill (`OngoingActivity`)**:
+  - Controlled by the **Watch Face Pill** (`ongoingPillEnabled`) toggle in Settings.
+  - When enabled, `OngoingPillIconRenderer` draws a dark circular contrast backdrop (`#0E121A`) with oversized 2-row stacked digits so the countdown remains legible even against One UI Watch's light-grey pill container.
 
-## 6. Hardware Button Handling
+## 6. Native Wear OS Compose Settings Menus & Hardware Button Handling
 
-- Inside `MainActivity.onKeyDown(keyCode, event)`, the activity inspects `KeyEvent.KEYCODE_STEM_PRIMARY`, `KeyEvent.KEYCODE_STEM_1`, and `KeyEvent.KEYCODE_STEM_2`.
-- Because `onKeyDown` only executes when `MainActivity` is in the foreground and holds window focus, it never overrides the user's system-wide Samsung Quick Button assignment when the watch is on the home screen or in another app.
+- **100% Native Wear OS Compose Menus**:
+  - `SettingsDrawerScreen` uses official `androidx.wear.compose.material` components: `ScalingLazyColumn` with rotary bezel scroll (`onRotaryScrollEvent`), `ListHeader`, `Chip`, `ToggleChip` with `Switch` for boolean toggles, dedicated single-choice sub-screens using `ToggleChip` with `RadioButton`, `InlineSlider` with `InlineSliderDefaults` icons, and `Picker` with circular `Button` actions.
+- **Hardware Button Handling**:
+  - Inside `MainActivity.onKeyDown(keyCode, event)`, the activity inspects `KeyEvent.KEYCODE_STEM_PRIMARY`, `KeyEvent.KEYCODE_STEM_1`, and `KeyEvent.KEYCODE_STEM_2`.
+  - Because `onKeyDown` only executes when `MainActivity` is in the foreground and holds window focus, it never overrides the user's system-wide Samsung Quick Button assignment when the watch is on the home screen or in another app.
