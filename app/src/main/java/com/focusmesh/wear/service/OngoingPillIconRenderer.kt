@@ -24,6 +24,11 @@ object OngoingPillIconRenderer {
         Typeface.BOLD
     )
 
+    private val backdropPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.rgb(14, 18, 26)
+    }
+
     private val topRowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -39,12 +44,15 @@ object OngoingPillIconRenderer {
 
     private val textBounds = Rect()
 
-    // Renders a 96x96 transparent-background Bitmap with oversized stacked countdown digits.
+    // Renders a 96x96 circular high-contrast Bitmap with oversized stacked countdown digits.
     fun renderTimerBitmap(state: TimerState, readinessLabel: String): Bitmap {
         val bitmap = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val centerX = ICON_SIZE * 0.5f
         val accentColor = resolveAccentColor(state)
+
+        // Draw a dark circular contrast disc so white digits remain crisp against One UI Watch's light-grey pill.
+        canvas.drawCircle(centerX, centerX, centerX, backdropPaint)
 
         if (state.phase == TimerPhase.READINESS && state.totalPhaseMillis <= 0L) {
             val label = readinessLabel.take(3).uppercase()

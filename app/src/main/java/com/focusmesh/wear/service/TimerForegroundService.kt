@@ -66,8 +66,13 @@ class TimerForegroundService : LifecycleService() {
                         totalPhaseMillis = updatedTotal,
                         isAwaitingManualContinue = current.phase == TimerPhase.READINESS && !prefs.readinessGraceEnabled
                     )
+                    FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
                 } else if (current.phase == TimerPhase.READINESS && oldPrefs.readinessGraceEnabled != prefs.readinessGraceEnabled) {
                     enterPhase(TimerPhase.READINESS, autoStart = prefs.readinessGraceEnabled, triggerAlerts = false)
+                }
+                if (oldPrefs.ongoingPillEnabled != prefs.ongoingPillEnabled && current.isRunning) {
+                    notificationManager.cancel(NOTIFICATION_ID)
+                    startForegroundWithOngoingActivity()
                 }
             }
         }
@@ -114,6 +119,7 @@ class TimerForegroundService : LifecycleService() {
         )
         scheduleExactWakeup(targetCompletionElapsedMillis)
         startForegroundWithOngoingActivity()
+        FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
         startUiTicker()
     }
 
@@ -126,6 +132,7 @@ class TimerForegroundService : LifecycleService() {
             remainingMillis = remaining
         )
         updateOngoingNotification()
+        FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
     }
 
     private fun resetCurrentPhase() {
@@ -141,6 +148,7 @@ class TimerForegroundService : LifecycleService() {
             isAwaitingManualContinue = phase == TimerPhase.READINESS && !latestPreferences.readinessGraceEnabled
         )
         updateOngoingNotification()
+        FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
     }
 
     private fun onExactAlarmExpired() {
@@ -154,6 +162,7 @@ class TimerForegroundService : LifecycleService() {
                 isAwaitingManualContinue = true
             )
             updateOngoingNotification()
+            FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
         } else {
             advanceToNextPhase(triggerAlerts = true)
         }
@@ -192,6 +201,7 @@ class TimerForegroundService : LifecycleService() {
             )
             scheduleExactWakeup(targetCompletionElapsedMillis)
             startForegroundWithOngoingActivity()
+            FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
             startUiTicker()
         } else {
             _timerState.value = TimerState(
@@ -202,6 +212,7 @@ class TimerForegroundService : LifecycleService() {
                 isAwaitingManualContinue = awaitingManual
             )
             startForegroundWithOngoingActivity()
+            FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
         }
     }
 
@@ -237,6 +248,7 @@ class TimerForegroundService : LifecycleService() {
             onExactAlarmExpired()
         } else {
             updateOngoingNotification()
+            FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
         }
     }
 
@@ -368,32 +380,34 @@ class TimerForegroundService : LifecycleService() {
                 .setUsesChronometer(false)
         }
 
-        val ongoingStatus = when {
-            state.isRunning && hasCountdown -> {
-                Status.forPart(Status.TimerPart(nowElapsed + state.remainingMillis))
-            }
-            !state.isRunning && hasCountdown -> {
-                Status.forPart(
-                    Status.TimerPart(
-                        nowElapsed + state.remainingMillis,
-                        nowElapsed
+        if (latestPreferences.ongoingPillEnabled) {
+            val ongoingStatus = when {
+                state.isRunning && hasCountdown -> {
+                    Status.forPart(Status.TimerPart(nowElapsed + state.remainingMillis))
+                }
+                !state.isRunning && hasCountdown -> {
+                    Status.forPart(
+                        Status.TimerPart(
+                            nowElapsed + state.remainingMillis,
+                            nowElapsed
+                        )
                     )
-                )
+                }
+                else -> {
+                    Status.forPart(Status.TextPart(readinessShortLabel))
+                }
             }
-            else -> {
-                Status.forPart(Status.TextPart(readinessShortLabel))
-            }
+
+            val ongoingActivity = OngoingActivity.Builder(applicationContext, NOTIFICATION_ID, builder)
+                .setStaticIcon(dynamicTimerIcon)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setTitle(formattedTime)
+                .setTouchIntent(contentPendingIntent)
+                .setStatus(ongoingStatus)
+                .build()
+
+            ongoingActivity.apply(applicationContext)
         }
-
-        val ongoingActivity = OngoingActivity.Builder(applicationContext, NOTIFICATION_ID, builder)
-            .setStaticIcon(dynamicTimerIcon)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setTitle(formattedTime)
-            .setTouchIntent(contentPendingIntent)
-            .setStatus(ongoingStatus)
-            .build()
-
-        ongoingActivity.apply(applicationContext)
         return builder.build()
     }
 
