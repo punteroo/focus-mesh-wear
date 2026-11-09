@@ -18,30 +18,29 @@ Knowledge workers who spend long hours looking at monitors frequently experience
 ## 3. Timer State Machine Requirements
 
 ### 3.1 Phase and State Definitions
-| State / Phase | Primary Color | Hex Palette | Default Duration | Behavior |
+| State / Phase | Primary Color | Hex Palette | Default Duration (`HH:MM:SS`) | Behavior |
 | :--- | :--- | :--- | :--- | :--- |
 | **Paused** | Vibrant Orange | `#FF6D1A` / `#A83A00` | Indefinite while paused | Always shown when a timer is paused; shifts smoothly into the active phase color when started. |
-| **Work** | Crimson Red | `#FF2E55` / `#9E1128` | 60 minutes (configurable) | Emits alert, transitions automatically to **Break**. |
-| **Break** | Light Sky Blue | `#38D6FF` / `#0A668E` | 15 minutes (configurable) | Emits alert, transitions to **Readiness**. |
-| **Readiness** | Amber Yellow | `#FFDD26` / `#9A7A00` | Manual continue (Optional grace timer: off by default, configurable 2-15 min) | Waits for user action to start **Work**. If optional grace timer is enabled and expires, emits a gentle reminder alert. |
+| **Work** | Clear Scarlet Red | `#FF4D5A` / `#D92B3A` | `01:00:00` (configurable to any `HH:MM:SS`) | Emits alert, transitions to **Break** in the **Paused** state so the user can manually start their break. |
+| **Break** | Light Sky Blue | `#38D6FF` / `#0A668E` | `00:15:00` (configurable to any `HH:MM:SS`) | Starts paused by default; once started and completed, emits alert and transitions to **Readiness**. |
+| **Readiness** | Amber Yellow | `#FFDD26` / `#9A7A00` | Manual continue (Optional grace timer: off by default, configurable `HH:MM:SS`) | Waits for user action to start **Work**. If optional grace timer is enabled and expires, emits a gentle reminder alert. |
 
 ### 3.2 Controls and Interactions
-- **Center Tap**: Starts, pauses, or resumes the active countdown (triggering a concentric shockwave, subtle scale/breathing transition, and color shift between **Paused Orange** and the active phase color); when in **Readiness**, a single tap begins the next **Work** cycle.
-- **Long Press on Timer**: Advances immediately to the next phase.
-- **Touch Drag Across Screen**: Deforms the full-screen 3D/2D mesh surface with a spring-damped wave ripple centered at the pointer location.
+- **Center Time Element Tap**: Tapping directly on the central time readout starts, pauses, or resumes the active countdown (triggering a concentric shockwave, subtle scale/breathing transition, and color shift between **Paused Orange** and the active phase color); when in **Readiness**, a single tap begins the next **Work** cycle.
+- **Center Time Element Long Press**: Advances immediately to the next phase.
+- **Touch Drag Across Screen**: Touching or dragging anywhere outside the right-edge bezel zone deforms the full-screen 3D/2D mesh surface freely without pausing the timer or scrolling the pager.
 - **Hardware Stem Button (While App Is Open)**: Pressing a secondary hardware button while the app window is focused triggers the primary phase action without altering system-wide button assignments outside the app.
-- **Swipe Left (From Right Side of Watch)**: Pulls in the Configuration UI drawer from the right side of the watch so it never conflicts with the left-edge system Back gesture.
+- **Swipe Left Starting from Right Edge**: Starting a swipe on the rightmost 16% edge of the watch screen and dragging left opens the Configuration UI drawer.
 
 ## 4. Visual and Typography Requirements
 
-- **Uncluttered Layout**: The main view contains only the animated mesh background, the large central timer digits (`MM:SS`), and a minimal single-word phase pill that fades to low opacity during active focus.
-- **3D Mesh Background**:
-  - Renders a perspective-projected 3D triangular/quad lattice driven by multi-frequency sine and simplex wave functions.
-  - Reacts to finger touch like a taut fabric sheet.
-  - Stops all animation loops immediately when the watch enters Ambient / Always-On Display (AOD) mode or when the screen turns off.
-  - Can be disabled in settings, switching to a lightweight 2D mesh with subtle drift animation and phase colors.
-- **Customizable Fonts**:
-  - Users can select from curated Google Fonts (such as *Space Grotesk*, *Outfit*, *JetBrains Mono*, *Syne*, and *Fraunces*) via Android's Downloadable Fonts provider with graceful system fallbacks when offline.
+- **Uncluttered Layout**: The main view contains only the background, the large central timer digits (`HH:MM:SS` or `MM:SS`), and a minimal single-word phase header with a breathing status dot.
+- **3-Way Background Mode & Battery Saver**:
+  - Users can choose between **3D Animated Mesh**, **2D Subtle Mesh**, and **Solid Color**.
+  - When **Solid Color** is selected OR when watch **Battery Saver** (`PowerManager.isPowerSaveMode`) is active, the mesh lattice and touch wave interaction are completely dropped in favor of a solid state-colored background.
+  - Also stops all animations immediately when the watch enters Ambient / Always-On Display (AOD) mode.
+- **Customizable Fonts with Live Settings Preview**:
+  - Users can select from curated Google Fonts (*Space Grotesk*, *Outfit*, *JetBrains Mono*, *Syne*, *Fraunces*, *Plus Jakarta Sans*) with an immediate inline preview sample inside the settings menu.
 
 ## 5. Audio, Haptics, and System Integration
 
