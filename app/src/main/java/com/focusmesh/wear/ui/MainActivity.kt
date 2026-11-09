@@ -52,14 +52,17 @@ class MainActivity : ComponentActivity() {
     private val ambientCallbacks = object : AmbientLifecycleObserver.AmbientLifecycleCallback {
         override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) {
             isAmbientState = true
+            viewModel.onAmbientUpdate()
         }
 
         override fun onExitAmbient() {
             isAmbientState = false
+            viewModel.onAmbientUpdate()
         }
 
         override fun onUpdateAmbient() {
-            // Static ambient frame requires no continuous animation updates.
+            // Synchronously refresh the remaining minutes on every 1-minute Wear OS ambient wakeup.
+            viewModel.onAmbientUpdate()
         }
     }
 

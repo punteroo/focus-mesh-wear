@@ -89,11 +89,12 @@ fun TimerScreen(
         isAwaitingManualContinue = timerState.isAwaitingManualContinue
     )
 
-    val accentColor by animateColorAsState(
+    val animatedAccentColor by animateColorAsState(
         targetValue = targetPalette.primary,
         animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing),
         label = "timerAccentColor"
     )
+    val accentColor = if (isAmbient) targetPalette.primary else animatedAccentColor
 
     var hasInitializedWave by remember { mutableStateOf(false) }
     LaunchedEffect(timerState.isRunning, timerState.phase) {
@@ -113,16 +114,23 @@ fun TimerScreen(
         label = "timerDigitsScale"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "timerBreathing")
-    val breathingAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "breathingAlpha"
-    )
+    // Suspend the infinite breathing transition in Ambient Mode so Compose renders a single static
+    // frame on each 1-minute onUpdateAmbient() wakeup without scheduling 60fps choreographer ticks.
+    val breathingAlpha = if (isAmbient) {
+        1.0f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "timerBreathing")
+        val animatedAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "breathingAlpha"
+        )
+        animatedAlpha
+    }
 
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -132,13 +140,11 @@ fun TimerScreen(
         TimerPhase.READINESS -> stringResource(R.string.phase_readiness)
     }
 
-    val centerDisplayText = if (
-        timerState.phase == TimerPhase.READINESS &&
-        !preferences.readinessGraceEnabled
-    ) {
-        stringResource(R.string.phase_readiness)
-    } else {
-        timerState.formattedTime()
+    val centerDisplayText = when {
+        timerState.phase == TimerPhase.READINESS && !preferences.readinessGraceEnabled ->
+            stringResource(R.string.phase_readiness)
+        isAmbient -> timerState.formattedAmbientTime()
+        else -> timerState.formattedTime()
     }
 
     val subHintText = when {

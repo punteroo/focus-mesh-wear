@@ -47,6 +47,15 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         sendServiceAction(TimerForegroundService.ACTION_RESET_PHASE)
     }
 
+    // Synchronously refreshes the timer state from SystemClock.elapsedRealtime() during Wear OS
+    // Ambient Mode transitions and 1-minute onUpdateAmbient() wakeups.
+    fun onAmbientUpdate() {
+        TimerForegroundService.refreshRemainingTimeFromClock()
+        if (timerState.value.isRunning) {
+            sendServiceAction(TimerForegroundService.ACTION_AMBIENT_UPDATE)
+        }
+    }
+
     fun cycleBackgroundMode() {
         val next = preferences.value.backgroundMode.next()
         viewModelScope.launch {
