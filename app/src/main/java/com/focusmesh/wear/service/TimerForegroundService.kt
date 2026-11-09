@@ -41,7 +41,6 @@ class TimerForegroundService : LifecycleService() {
 
     private var latestPreferences = UserPreferences()
     private var tickerJob: Job? = null
-    private var targetCompletionElapsedMillis: Long = 0L
     private var lastNotificationSecond: Long = -1L
 
     override fun onCreate() {
@@ -80,6 +79,7 @@ class TimerForegroundService : LifecycleService() {
             ACTION_SKIP_PHASE -> advanceToNextPhase(triggerAlerts = true)
             ACTION_RESET_PHASE -> resetCurrentPhase()
             ACTION_ALARM_EXPIRED -> onExactAlarmExpired()
+            ACTION_AMBIENT_UPDATE -> onAmbientTickUpdate()
         }
         return START_STICKY
     }
@@ -223,6 +223,19 @@ class TimerForegroundService : LifecycleService() {
                 }
                 delay(250L)
             }
+        }
+    }
+
+    // Invoked during Wear OS 1-minute Ambient Mode wakeups or when exiting Ambient Mode so both the
+    // UI state and ongoing watch face notification stay synchronized with SystemClock.elapsedRealtime().
+    private fun onAmbientTickUpdate() {
+        val current = _timerState.value
+        if (!current.isRunning) return
+        val remaining = refreshRemainingTimeFromClock()
+        if (remaining <= 0L) {
+            onExactAlarmExpired()
+        } else {
+            updateOngoingNotification()
         }
     }
 
@@ -387,12 +400,27 @@ class TimerForegroundService : LifecycleService() {
         const val ACTION_SKIP_PHASE = "com.focusmesh.wear.action.SKIP_PHASE"
         const val ACTION_RESET_PHASE = "com.focusmesh.wear.action.RESET_PHASE"
         const val ACTION_ALARM_EXPIRED = "com.focusmesh.wear.action.ALARM_EXPIRED"
+        const val ACTION_AMBIENT_UPDATE = "com.focusmesh.wear.action.AMBIENT_UPDATE"
 
         private const val CHANNEL_ID = "focus_mesh_ongoing_channel"
         private const val NOTIFICATION_ID = 1001
         private const val ALARM_REQUEST_CODE = 2001
 
+        @Volatile
+        private var targetCompletionElapsedMillis: Long = 0L
+
         private val _timerState = MutableStateFlow(TimerState())
         val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
+
+        // Synchronously recalculates the remaining milliseconds from SystemClock.elapsedRealtime()
+        // so that MainActivity.onUpdateAmbient() immediately updates the Compose state before
+        // Wear OS latches the display frame and suspends the CPU again.
+        fun refreshRemainingTimeFromClock(): Long {
+            val current = _timerState.value
+            if (!current.isRunning) return current.remainingMillis
+            val remaining = (targetCompletionElapsedMillis - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+            _timerState.value = current.copy(remainingMillis = remaining)
+            return remaining
+        }
     }
 }
