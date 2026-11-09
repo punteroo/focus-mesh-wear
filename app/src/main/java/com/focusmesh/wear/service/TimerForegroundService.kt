@@ -161,7 +161,7 @@ class TimerForegroundService : LifecycleService() {
 
         if (triggerAlerts) {
             alertController.triggerPhaseAlert(
-                phase = if (current.phase == TimerPhase.WORK) TimerPhase.BREAK else TimerPhase.WORK,
+                newPhase = if (current.phase == TimerPhase.WORK) TimerPhase.BREAK else TimerPhase.WORK,
                 preferences = latestPreferences
             )
         }
