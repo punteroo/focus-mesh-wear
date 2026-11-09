@@ -10,7 +10,7 @@ import android.graphics.drawable.Icon
 import com.focusmesh.wear.domain.model.TimerPhase
 import com.focusmesh.wear.domain.model.TimerState
 
-// Renders a transparent-background Bitmap Icon containing the live MM:SS timer text and a phase progress ring.
+// Renders a transparent-background Bitmap Icon containing the live countdown text and a phase progress ring.
 // Wear OS OngoingActivity displays the static/animated Icon at the bottom of the watch face, while Status text
 // is only shown in the app launcher Recents list. Rendering the countdown directly into the Icon ensures the
 // watch face pill displays the live timer readout in both full-color and monochrome-tinted watch face modes.
@@ -52,11 +52,11 @@ object OngoingPillIconRenderer {
         val sweepAngle = (state.progressFraction().coerceIn(0.0f, 1.0f) * 360.0f)
         canvas.drawArc(arcBounds, -90.0f, sweepAngle, false, progressPaint)
 
-        // Draw high-contrast countdown text centered inside the badge.
+        // Draw high-contrast compact countdown text centered inside the badge.
         val label = if (state.phase == TimerPhase.READINESS && state.totalPhaseMillis <= 0L) {
             readinessLabel.take(5)
         } else {
-            state.formattedTime()
+            state.compactPillTime()
         }
 
         textPaint.textSize = if (label.length <= 4) 30.0f else 27.0f

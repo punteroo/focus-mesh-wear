@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 // Foreground service maintaining the continuous Work -> Break -> Readiness cycle.
-// Renders the live MM:SS countdown directly into the OngoingActivity Icon and Status so the watch face
+// Renders the live countdown directly into the OngoingActivity Icon and Status so the watch face
 // indicator displays the current time rather than a static alarm icon.
 class TimerForegroundService : LifecycleService() {
 
@@ -58,6 +58,7 @@ class TimerForegroundService : LifecycleService() {
                 val oldPrefs = latestPreferences
                 latestPreferences = prefs
                 val current = _timerState.value
+                // When paused at the full duration of a phase, immediately reflect newly saved duration changes.
                 if (!current.isRunning && current.remainingMillis == current.totalPhaseMillis) {
                     val updatedTotal = phaseDurationMillis(current.phase, prefs)
                     _timerState.value = current.copy(
@@ -161,7 +162,8 @@ class TimerForegroundService : LifecycleService() {
         val next = _timerState.value.phase.nextPhase()
         val shouldAutoStart = when (next) {
             TimerPhase.WORK -> true
-            TimerPhase.BREAK -> true
+            // Break timer enters paused state by default so the user can manually start their break when ready.
+            TimerPhase.BREAK -> false
             TimerPhase.READINESS -> latestPreferences.readinessGraceEnabled
         }
         enterPhase(next, autoStart = shouldAutoStart, triggerAlerts = triggerAlerts)
@@ -225,10 +227,10 @@ class TimerForegroundService : LifecycleService() {
     }
 
     private fun phaseDurationMillis(phase: TimerPhase, prefs: UserPreferences): Long = when (phase) {
-        TimerPhase.WORK -> prefs.workDurationMinutes * 60L * 1000L
-        TimerPhase.BREAK -> prefs.breakDurationMinutes * 60L * 1000L
+        TimerPhase.WORK -> prefs.workDurationSeconds.coerceAtLeast(1) * 1000L
+        TimerPhase.BREAK -> prefs.breakDurationSeconds.coerceAtLeast(1) * 1000L
         TimerPhase.READINESS -> if (prefs.readinessGraceEnabled) {
-            prefs.readinessGraceMinutes * 60L * 1000L
+            prefs.readinessGraceSeconds.coerceAtLeast(1) * 1000L
         } else {
             0L
         }
@@ -290,7 +292,7 @@ class TimerForegroundService : LifecycleService() {
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-    // Builds the ongoing notification using a dynamically rendered MM:SS bitmap Icon so the watch face
+    // Builds the ongoing notification using a dynamically rendered countdown bitmap Icon so the watch face
     // OngoingActivity indicator displays the live countdown time instead of a static alarm icon.
     private fun buildOngoingNotification(): Notification {
         val state = _timerState.value
