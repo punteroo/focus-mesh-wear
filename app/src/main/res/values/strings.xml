@@ -18,9 +18,12 @@
     <string name="ongoing_work_status">Focus: %1$s</string>
     <string name="ongoing_break_status">No-Screen Break: %1$s</string>
     <string name="ongoing_readiness_status">Ready to continue</string>
+    <string name="complication_provider_label">FocusMesh Timer</string>
 
     <!-- Configuration drawer section titles and controls (opened by swiping from the right edge). -->
     <string name="settings_title">Configuration</string>
+    <string name="settings_ongoing_pill">Watch Face Pill</string>
+    <string name="settings_ongoing_pill_desc">Bottom ongoing icon</string>
     <string name="settings_bg_mode">Background Mode</string>
     <string name="bg_mode_3d">3D Animated Mesh</string>
     <string name="bg_mode_2d">2D Subtle Mesh</string>

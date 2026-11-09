@@ -18,9 +18,12 @@
     <string name="ongoing_work_status">Enfoque: %1$s</string>
     <string name="ongoing_break_status">Descanso sin pantallas: %1$s</string>
     <string name="ongoing_readiness_status">Listo para continuar</string>
+    <string name="complication_provider_label">Temporizador FocusMesh</string>
 
     <!-- Configuration drawer section titles and controls (opened by swiping from the right edge). -->
     <string name="settings_title">Configuracion</string>
+    <string name="settings_ongoing_pill">Pastilla en Pantalla</string>
+    <string name="settings_ongoing_pill_desc">Icono inferior activo</string>
     <string name="settings_bg_mode">Modo de Fondo</string>
     <string name="bg_mode_3d">Malla 3D Animada</string>
     <string name="bg_mode_2d">Malla 2D Sutil</string>
