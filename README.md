@@ -13,21 +13,22 @@ Extended screen exposure can trigger digitally induced dizziness and visual vert
 ## Key Features
 
 - **Uncluttered Full-Screen Timer**: Displays the active timer directly in the center of the watch face with minimal text.
-- **Interactive 3D & 2D Mesh Background**:
-  - **3D Mode (Default)**: A perspective-projected 3D wireframe and shaded surface mesh animated in real time, colored dynamically by the active phase (Red, Light Blue, Yellow).
+- **Interactive Full-Screen 3D & 2D Mesh Background**:
+  - **Full-Screen 3D Mode (Default)**: An overscanned perspective-projected 3D wireframe and shaded surface mesh that fills 100% of the circular watch screen edge-to-edge.
+  - **Paused Orange to Active Phase Color Shift**: Whenever the timer is paused, the mesh and UI glow in **Paused (Orange)** with a slow breathing rhythm. Starting the timer triggers a concentric shockwave, accelerates wave flow, and smoothly shifts the color into **Work (Red)**, **Break (Light Blue)**, or **Readiness (Yellow)**.
   - **Touch Wave Physics**: Touching or dragging across the screen displaces the mesh like a fabric sheet or propagating liquid wave using spring-damped grid physics.
-  - **2D Fallback Mode**: Can be toggled in settings to replace the 3D perspective mesh with a flat 2D mesh featuring subtle drift animations.
+  - **2D Fallback Mode**: Can be toggled in settings to replace the 3D perspective mesh with a full-screen 2D mesh featuring subtle drift animations.
   - **Battery-Safe Ambient / Sleep Mode**: When the watch enters Always-On Display (AOD) or goes to sleep, mesh animations stop completely and render a static low-power outline.
 - **Do Not Disturb (DND) Bypass Alerts**:
   - Routes audio alerts through `AudioAttributes.USAGE_ALARM` (`STREAM_ALARM`) and haptic alerts through `VibrationAttributes.USAGE_ALARM` paired with `AlarmManager.setExactAndAllowWhileIdle()`.
   - Continues to emit audible chimes and tactile vibrations even when Samsung Modes and Routines or Do Not Disturb are active.
 - **Non-Robotic Acoustic Sounds & Custom Volume**:
-  - Includes multi-harmonic acoustic chimes synthesized with natural exponential decay (Singing Bowl, Warm Marimba, Crystal Chime, Soft Gong) alongside access to native watch alarm tones via `RingtoneManager`.
+  - Includes multi-harmonic acoustic chimes synthesized with natural exponential decay (Singing Bowl, Warm Marimba, Crystal Chime, Soft Gong) alongside single-shot playback of native watch alarm tones via `RingtoneManager`.
   - Configurable alert mode: **Sound + Haptics** (default), **Sound Only**, **Haptics Only**, or **Silent**.
 - **One UI Watch Island & Ongoing Activity**:
   - Integrates with the Wear OS `OngoingActivity` API so the active countdown appears as a floating status pill/island on the Galaxy Watch Ultra home watch face.
-- **Left-Swipe Configuration Drawer**:
-  - Swiping from the left edge of the main timer opens the configuration drawer without accidentally dismissing the app, allowing customization of Google Fonts, 3D/2D mesh mode, alert mode, volume, sound selection, and optional Readiness grace duration.
+- **Right-Side Configuration Drawer**:
+  - Swiping left (pulling from the right side of the watch) opens the configuration drawer on the opposite side of the Wear OS system Back gesture, allowing customization of Google Fonts, 3D/2D mesh mode, alert mode, volume, sound selection, and optional Readiness grace duration.
 - **In-App Hardware Button Action**:
   - While the app is open and focused, pressing a secondary hardware watch stem button advances or toggles the timer without overriding your system-wide Galaxy Watch Ultra Quick Button binding outside the app.
 - **Bilingual Support**:

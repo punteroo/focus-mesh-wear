@@ -17,19 +17,20 @@ Knowledge workers who spend long hours looking at monitors frequently experience
 
 ## 3. Timer State Machine Requirements
 
-### 3.1 Phase Definitions
-| Phase | Primary Color | Hex Palette | Default Duration | Completion Behavior |
+### 3.1 Phase and State Definitions
+| State / Phase | Primary Color | Hex Palette | Default Duration | Behavior |
 | :--- | :--- | :--- | :--- | :--- |
-| **Work** | Crimson Red | `#FF2A4B` / `#8A0F24` | 60 minutes (configurable) | Emits alert, transitions automatically to **Break**. |
-| **Break** | Light Sky Blue | `#38D6FF` / `#0A5C8A` | 15 minutes (configurable) | Emits alert, transitions to **Readiness**. |
-| **Readiness** | Amber Yellow | `#FFD426` / `#8A6800` | Manual continue (Optional grace timer: off by default, configurable 1-15 min) | Waits for user action to start **Work**. If optional grace timer is enabled and expires, emits a gentle reminder alert. |
+| **Paused** | Vibrant Orange | `#FF6D1A` / `#A83A00` | Indefinite while paused | Always shown when a timer is paused; shifts smoothly into the active phase color when started. |
+| **Work** | Crimson Red | `#FF2E55` / `#9E1128` | 60 minutes (configurable) | Emits alert, transitions automatically to **Break**. |
+| **Break** | Light Sky Blue | `#38D6FF` / `#0A668E` | 15 minutes (configurable) | Emits alert, transitions to **Readiness**. |
+| **Readiness** | Amber Yellow | `#FFDD26` / `#9A7A00` | Manual continue (Optional grace timer: off by default, configurable 2-15 min) | Waits for user action to start **Work**. If optional grace timer is enabled and expires, emits a gentle reminder alert. |
 
 ### 3.2 Controls and Interactions
-- **Center Tap**: Starts, pauses, or resumes the active countdown; when in **Readiness**, a single tap begins the next **Work** cycle.
-- **Long Press on Timer**: Advances immediately to the next phase or resets the current cycle.
-- **Touch Drag Across Screen**: Deforms the 3D/2D mesh surface with a spring-damped wave ripple centered at the pointer location.
+- **Center Tap**: Starts, pauses, or resumes the active countdown (triggering a concentric shockwave, subtle scale/breathing transition, and color shift between **Paused Orange** and the active phase color); when in **Readiness**, a single tap begins the next **Work** cycle.
+- **Long Press on Timer**: Advances immediately to the next phase.
+- **Touch Drag Across Screen**: Deforms the full-screen 3D/2D mesh surface with a spring-damped wave ripple centered at the pointer location.
 - **Hardware Stem Button (While App Is Open)**: Pressing a secondary hardware button while the app window is focused triggers the primary phase action without altering system-wide button assignments outside the app.
-- **Swipe from Left Edge**: Opens the Configuration UI drawer.
+- **Swipe Left (From Right Side of Watch)**: Pulls in the Configuration UI drawer from the right side of the watch so it never conflicts with the left-edge system Back gesture.
 
 ## 4. Visual and Typography Requirements
 
