@@ -184,12 +184,12 @@ fun MeshBackgroundCanvas(
 
                 if (!isAmbient) {
                     val baseFacetAlpha = if (mesh3dEnabled) {
-                        0.07f + elevationNorm * (0.14f + 0.12f * activeEnergy)
+                        0.10f + elevationNorm * (0.16f + 0.14f * activeEnergy)
                     } else {
-                        0.05f + elevationNorm * 0.10f
+                        0.07f + elevationNorm * 0.12f
                     }
                     val facetColor = lerpColor(secondaryColor, primaryColor, elevationNorm)
-                        .copy(alpha = baseFacetAlpha.coerceIn(0.04f, 0.34f))
+                        .copy(alpha = baseFacetAlpha.coerceIn(0.06f, 0.40f))
 
                     trianglePath.reset()
                     trianglePath.moveTo(x00, y00)
@@ -208,33 +208,33 @@ fun MeshBackgroundCanvas(
 
                 val lineAlpha = when {
                     isAmbient -> 0.16f
-                    mesh3dEnabled -> (0.22f + elevationNorm * (0.35f + 0.22f * activeEnergy)).coerceIn(0.18f, 0.82f)
-                    else -> (0.20f + 0.12f * activeEnergy).coerceIn(0.18f, 0.40f)
+                    mesh3dEnabled -> (0.28f + elevationNorm * (0.38f + 0.22f * activeEnergy)).coerceIn(0.24f, 0.88f)
+                    else -> (0.24f + 0.14f * activeEnergy).coerceIn(0.22f, 0.45f)
                 }
                 val lineColor = lerpColor(secondaryColor, primaryColor, elevationNorm).copy(alpha = lineAlpha)
-                val strokeWidth = if (isAmbient) 1.0f else (1.2f + 0.4f * activeEnergy)
+                val strokeWidth = if (isAmbient) 1.0f else (1.3f + 0.4f * activeEnergy)
 
                 drawLine(color = lineColor, start = Offset(x00, y00), end = Offset(x10, y10), strokeWidth = strokeWidth)
                 drawLine(color = lineColor, start = Offset(x00, y00), end = Offset(x01, y01), strokeWidth = strokeWidth)
                 if (mesh3dEnabled && !isAmbient) {
                     drawLine(
-                        color = lineColor.copy(alpha = lineAlpha * 0.50f),
+                        color = lineColor.copy(alpha = lineAlpha * 0.55f),
                         start = Offset(x10, y10),
                         end = Offset(x01, y01),
-                        strokeWidth = 0.85f
+                        strokeWidth = 0.9f
                     )
                 }
             }
         }
 
-        // Draw subtle inner depth shading and an animated progress / status ring around the watch perimeter.
+        // Draw light inner depth shading and an animated progress / status ring around the watch perimeter.
         if (!isAmbient) {
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.Black.copy(alpha = 0.32f),
+                        Color.Black.copy(alpha = 0.15f),
                         Color.Transparent,
-                        Color.Black.copy(alpha = 0.58f)
+                        Color.Black.copy(alpha = 0.38f)
                     ),
                     center = Offset(centerX, centerY),
                     radius = radius
