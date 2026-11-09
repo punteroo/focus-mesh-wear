@@ -30,9 +30,10 @@ The background renderer (`MeshBackgroundCanvas` and `WavePhysicsState`) supports
 - **Solid Color Mode & Automatic Battery Saver**:
   - `MainActivity` observes `PowerManager.isPowerSaveMode` and listens to `PowerManager.ACTION_POWER_SAVE_MODE_CHANGED`.
   - When `BackgroundMode.SOLID_COLOR` is selected OR when watch Battery Saver is active, the frame clock loop, vertex projection, and touch wave input are completely bypassed, rendering a solid state-colored background and perimeter progress ring.
-- **Ambient Mode (AOD) Conservation**:
+- **Ambient Mode (AOD) Conservation & Minute-Granularity Display**:
   - `MainActivity` observes lifecycle and ambient state changes via `AmbientLifecycleObserver`.
-  - When `isAmbient` is true, the frame clock ticker pauses completely.
+  - When `isAmbient` is true, the mesh frame clock ticker and infinite UI breathing animations pause completely, and `TimerScreen` switches from second-granularity (`HH:MM:SS` / `MM:SS`) to minute-granularity (`formattedAmbientTime()`, e.g., `1h 00m` or `59m`) so the display never appears frozen on a stale second while the Wear OS display hardware is in 1-minute refresh mode.
+  - On `onEnterAmbient()`, `onUpdateAmbient()`, and `onExitAmbient()`, `MainActivity` invokes `TimerViewModel.onAmbientUpdate()` to synchronously recalculate `remainingMillis` against `SystemClock.elapsedRealtime()` before the system latches the AOD display buffer.
 
 ## 4. Do Not Disturb Bypass & Exact Timing Pipeline
 
