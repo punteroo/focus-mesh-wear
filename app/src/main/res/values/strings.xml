@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Primary English localization strings for the timer display, ongoing activity status, and configuration drawer. -->
+<!-- Primary English localization strings for the timer display, ongoing activity status, presets, and tutorial. -->
 <resources>
     <string name="app_name">FocusMesh</string>
 
@@ -20,8 +20,34 @@
     <string name="ongoing_readiness_status">Ready to continue</string>
     <string name="complication_provider_label">FocusMesh Timer</string>
 
+    <!-- Routine modes and Flexible Mode bottom drawer strings. -->
+    <string name="settings_routine_mode">Timer Mode</string>
+    <string name="mode_standard">Standard Mode</string>
+    <string name="mode_standard_desc">Sequential Work to Break cycle</string>
+    <string name="mode_flexible">Flexible Mode</string>
+    <string name="mode_flexible_desc">Swap Work &amp; Break anytime</string>
+    <string name="flexible_sheet_title">Flexible Controls</string>
+    <string name="flexible_swap_to_break">Swap to Break (%1$s)</string>
+    <string name="flexible_swap_to_work">Swap to Work (%1$s)</string>
+    <string name="flexible_badge_break">BRK %1$s</string>
+    <string name="flexible_badge_work">WRK %1$s</string>
+
+    <!-- Per-mode presets strings. -->
+    <string name="presets_select_title">Select Preset</string>
+    <string name="settings_standard_presets">Standard Mode Presets</string>
+    <string name="settings_flexible_presets">Flexible Mode Presets</string>
+    <string name="preset_add_new">+ New Preset</string>
+    <string name="preset_edit_title">Edit Preset</string>
+    <string name="preset_name_label">Preset Name</string>
+    <string name="preset_name_hint">Max 16 chars [A-Za-z0-9 -_]</string>
+    <string name="preset_delete">Delete Preset</string>
+    <string name="preset_default_badge">Default (Protected)</string>
+    <string name="preset_use_now">Use This Preset</string>
+    <string name="preset_summary_format">%1$s active - %2$s break</string>
+
     <!-- Configuration drawer section titles and controls (opened by swiping from the right edge). -->
     <string name="settings_title">Configuration</string>
+    <string name="settings_open_tutorial">Interactive Tutorial</string>
     <string name="settings_ongoing_pill">Watch Face Pill</string>
     <string name="settings_ongoing_pill_desc">Bottom ongoing icon</string>
     <string name="settings_bg_mode">Background Mode</string>
@@ -40,7 +66,7 @@
     <string name="settings_sound_option">Alert Sound</string>
     <string name="settings_volume">Alert Volume: %1$d%%</string>
     <string name="settings_test_alert">Preview Sound &amp; Haptics</string>
-    <string name="settings_skip_phase">Skip Current Phase</string>
+    <string name="settings_skip_phase">Skip / Swap Phase</string>
     <string name="settings_reset_timer">Reset Phase Timer</string>
 
     <!-- Duration picker dialog labels (Hours, Minutes, Seconds). -->
@@ -62,4 +88,15 @@
     <string name="sound_crystal_chime">Crystal Wind Chime</string>
     <string name="sound_soft_gong">Soft Zen Gong</string>
     <string name="sound_system_alarm">Watch System Alarm</string>
+
+    <!-- Interactive 4-step Tutorial strings. -->
+    <string name="tutorial_step_1_title">1. Right-Edge Settings</string>
+    <string name="tutorial_step_1_body">Swipe left from the right edge of the watch to open configurations and presets.</string>
+    <string name="tutorial_step_2_title">2. Tap the Clock</string>
+    <string name="tutorial_step_2_body">Tap directly on the clock to start or pause. Tap the preset name above it to switch presets.</string>
+    <string name="tutorial_step_3_title">3. Watch Complications</string>
+    <string name="tutorial_step_3_body">Add the official FocusMesh Wear OS complication to your watch face for live countdowns.</string>
+    <string name="tutorial_step_4_title">4. Flexible Mode</string>
+    <string name="tutorial_step_4_body">Swipe up from the bottom edge to use Flexible mode and swap between Work and Break freely.</string>
+    <string name="tutorial_done">Start Using FocusMesh</string>
 </resources>

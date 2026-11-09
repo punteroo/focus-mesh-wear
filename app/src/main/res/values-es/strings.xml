@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Spanish localization strings for the timer display, ongoing activity status, and configuration drawer. -->
+<!-- Spanish localization strings for the timer display, ongoing activity status, presets, and tutorial. -->
 <resources>
     <string name="app_name">FocusMesh</string>
 
@@ -20,8 +20,34 @@
     <string name="ongoing_readiness_status">Listo para continuar</string>
     <string name="complication_provider_label">Temporizador FocusMesh</string>
 
+    <!-- Routine modes and Flexible Mode bottom drawer strings. -->
+    <string name="settings_routine_mode">Modo de Temporizador</string>
+    <string name="mode_standard">Modo Estandar</string>
+    <string name="mode_standard_desc">Ciclo secuencial Enfoque a Descanso</string>
+    <string name="mode_flexible">Modo Flexible</string>
+    <string name="mode_flexible_desc">Alterna Enfoque y Descanso libremente</string>
+    <string name="flexible_sheet_title">Controles Flexibles</string>
+    <string name="flexible_swap_to_break">Cambiar a Descanso (%1$s)</string>
+    <string name="flexible_swap_to_work">Cambiar a Enfoque (%1$s)</string>
+    <string name="flexible_badge_break">DESC %1$s</string>
+    <string name="flexible_badge_work">ENF %1$s</string>
+
+    <!-- Per-mode presets strings. -->
+    <string name="presets_select_title">Seleccionar Ajuste</string>
+    <string name="settings_standard_presets">Ajustes Modo Estandar</string>
+    <string name="settings_flexible_presets">Ajustes Modo Flexible</string>
+    <string name="preset_add_new">+ Nuevo Ajuste</string>
+    <string name="preset_edit_title">Editar Ajuste</string>
+    <string name="preset_name_label">Nombre del Ajuste</string>
+    <string name="preset_name_hint">Max 16 car. [A-Za-z0-9 -_]</string>
+    <string name="preset_delete">Eliminar Ajuste</string>
+    <string name="preset_default_badge">Predeterminado (Protegido)</string>
+    <string name="preset_use_now">Usar Este Ajuste</string>
+    <string name="preset_summary_format">%1$s activo - %2$s descanso</string>
+
     <!-- Configuration drawer section titles and controls (opened by swiping from the right edge). -->
     <string name="settings_title">Configuracion</string>
+    <string name="settings_open_tutorial">Tutorial Interactivo</string>
     <string name="settings_ongoing_pill">Pastilla en Pantalla</string>
     <string name="settings_ongoing_pill_desc">Icono inferior activo</string>
     <string name="settings_bg_mode">Modo de Fondo</string>
@@ -40,7 +66,7 @@
     <string name="settings_sound_option">Sonido de Alerta</string>
     <string name="settings_volume">Volumen: %1$d%%</string>
     <string name="settings_test_alert">Probar Sonido y Vibracion</string>
-    <string name="settings_skip_phase">Saltar Fase Actual</string>
+    <string name="settings_skip_phase">Saltar / Alternar Fase</string>
     <string name="settings_reset_timer">Reiniciar Fase</string>
 
     <!-- Duration picker dialog labels (Hours, Minutes, Seconds). -->
@@ -62,4 +88,15 @@
     <string name="sound_crystal_chime">Campana de Cristal</string>
     <string name="sound_soft_gong">Gong Zen Suave</string>
     <string name="sound_system_alarm">Alarma del Reloj</string>
+
+    <!-- Interactive 4-step Tutorial strings. -->
+    <string name="tutorial_step_1_title">1. Ajustes a la Derecha</string>
+    <string name="tutorial_step_1_body">Desliza desde el borde derecho del reloj para abrir la configuracion y los ajustes.</string>
+    <string name="tutorial_step_2_title">2. Toca el Reloj</string>
+    <string name="tutorial_step_2_body">Toca el reloj para iniciar o pausar. Toca el nombre superior para cambiar de ajuste.</string>
+    <string name="tutorial_step_3_title">3. Complicaciones Wear OS</string>
+    <string name="tutorial_step_3_body">Agrega la complicacion oficial de FocusMesh a tu esfera para ver el conteo en vivo.</string>
+    <string name="tutorial_step_4_title">4. Modo Flexible</string>
+    <string name="tutorial_step_4_body">Desliza hacia arriba desde el borde inferior para usar el Modo Flexible y alternar libremente.</string>
+    <string name="tutorial_done">Comenzar a Usar</string>
 </resources>
