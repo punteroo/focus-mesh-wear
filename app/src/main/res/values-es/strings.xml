@@ -19,22 +19,33 @@
     <string name="ongoing_break_status">Descanso sin pantallas: %1$s</string>
     <string name="ongoing_readiness_status">Listo para continuar</string>
 
-    <!-- Configuration drawer section titles and controls (opened by swiping from the left). -->
+    <!-- Configuration drawer section titles and controls (opened by swiping from the right edge). -->
     <string name="settings_title">Configuracion</string>
-    <string name="settings_mesh_3d">Malla 3D Animada</string>
-    <string name="settings_mesh_2d_sub">Malla 2D sutil al desactivar</string>
+    <string name="settings_bg_mode">Modo de Fondo</string>
+    <string name="bg_mode_3d">Malla 3D Animada</string>
+    <string name="bg_mode_2d">Malla 2D Sutil</string>
+    <string name="bg_mode_solid">Color Solido</string>
+    <string name="bg_battery_saver_active">Ahorro Bateria: Color Solido</string>
     <string name="settings_touch_wave">Onda Tactil en Malla</string>
     <string name="settings_readiness_grace">Tiempo de Gracia</string>
-    <string name="settings_grace_minutes">Gracia: %1$d min</string>
-    <string name="settings_work_minutes">Enfoque: %1$d min</string>
-    <string name="settings_break_minutes">Descanso: %1$d min</string>
+    <string name="settings_grace_duration">Duracion de Gracia</string>
+    <string name="settings_work_duration">Duracion de Enfoque</string>
+    <string name="settings_break_duration">Duracion de Descanso</string>
     <string name="settings_font_label">Tipografia</string>
+    <string name="settings_font_preview_sample">59:42 ENFOQUE</string>
     <string name="settings_alert_mode">Modo de Alerta</string>
     <string name="settings_sound_option">Sonido de Alerta</string>
     <string name="settings_volume">Volumen: %1$d%%</string>
     <string name="settings_test_alert">Probar Sonido y Vibracion</string>
     <string name="settings_skip_phase">Saltar Fase Actual</string>
     <string name="settings_reset_timer">Reiniciar Fase</string>
+
+    <!-- Duration picker dialog labels (Hours, Minutes, Seconds). -->
+    <string name="picker_hours">HR</string>
+    <string name="picker_minutes">MIN</string>
+    <string name="picker_seconds">SEG</string>
+    <string name="picker_save">Guardar</string>
+    <string name="picker_cancel">Cancelar</string>
 
     <!-- Alert output mode labels. -->
     <string name="alert_mode_all">Sonido + Vibracion</string>

@@ -19,22 +19,33 @@
     <string name="ongoing_break_status">No-Screen Break: %1$s</string>
     <string name="ongoing_readiness_status">Ready to continue</string>
 
-    <!-- Configuration drawer section titles and controls (opened by swiping from the left). -->
+    <!-- Configuration drawer section titles and controls (opened by swiping from the right edge). -->
     <string name="settings_title">Configuration</string>
-    <string name="settings_mesh_3d">3D Animated Mesh</string>
-    <string name="settings_mesh_2d_sub">2D subtle mesh when off</string>
+    <string name="settings_bg_mode">Background Mode</string>
+    <string name="bg_mode_3d">3D Animated Mesh</string>
+    <string name="bg_mode_2d">2D Subtle Mesh</string>
+    <string name="bg_mode_solid">Solid Color</string>
+    <string name="bg_battery_saver_active">Battery Saver: Solid Forced</string>
     <string name="settings_touch_wave">Touch Wave Ripple</string>
     <string name="settings_readiness_grace">Readiness Grace Timer</string>
-    <string name="settings_grace_minutes">Grace Duration: %1$d min</string>
-    <string name="settings_work_minutes">Work Duration: %1$d min</string>
-    <string name="settings_break_minutes">Break Duration: %1$d min</string>
+    <string name="settings_grace_duration">Grace Duration</string>
+    <string name="settings_work_duration">Work Duration</string>
+    <string name="settings_break_duration">Break Duration</string>
     <string name="settings_font_label">Font Family</string>
+    <string name="settings_font_preview_sample">59:42 FOCUS</string>
     <string name="settings_alert_mode">Alert Output</string>
     <string name="settings_sound_option">Alert Sound</string>
     <string name="settings_volume">Alert Volume: %1$d%%</string>
     <string name="settings_test_alert">Preview Sound &amp; Haptics</string>
     <string name="settings_skip_phase">Skip Current Phase</string>
     <string name="settings_reset_timer">Reset Phase Timer</string>
+
+    <!-- Duration picker dialog labels (Hours, Minutes, Seconds). -->
+    <string name="picker_hours">HR</string>
+    <string name="picker_minutes">MIN</string>
+    <string name="picker_seconds">SEC</string>
+    <string name="picker_save">Save</string>
+    <string name="picker_cancel">Cancel</string>
 
     <!-- Alert output mode labels. -->
     <string name="alert_mode_all">Sound + Haptics</string>
