@@ -158,13 +158,7 @@ fun TimerScreen(
                         }
                     }
                 }
-            }
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onPrimaryTap,
-                onLongClick = onLongPressSkip
-            ),
+            },
         contentAlignment = Alignment.Center
     ) {
         MeshBackgroundCanvas(
@@ -177,12 +171,20 @@ fun TimerScreen(
             wavePhysicsState = wavePhysicsState
         )
 
+        // Only tapping or long-pressing directly on the central time element toggles or skips the timer.
+        // Touching anywhere else on the screen interacts purely with the 3D mesh waves.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .padding(horizontal = 12.dp)
                 .scale(if (isAmbient) 1.0f else timerScale)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onPrimaryTap,
+                    onLongClick = onLongPressSkip
+                )
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             // Minimal phase header with a subtle animated status dot.
             Row(
