@@ -142,7 +142,8 @@ class TimerForegroundService : LifecycleService() {
         }
     }
 
-    // In Flexible Mode, swaps between WORK and BREAK while pausing and preserving each timer's remaining pool.
+    // In Flexible Mode, swaps between WORK and BREAK while pausing and preserving the outgoing timer's
+    // remaining pool and automatically unpausing (starting/resuming) the incoming timer.
     private fun swapFlexibleWorkAndBreak(triggerAlerts: Boolean) {
         val current = _timerState.value
         if (current.phase == TimerPhase.READINESS) {
@@ -177,12 +178,13 @@ class TimerForegroundService : LifecycleService() {
             } else {
                 fullBreakMillis
             }
+            targetCompletionElapsedMillis = SystemClock.elapsedRealtime() + nextBreakRemaining
             _timerState.value = current.copy(
                 routineMode = RoutineMode.FLEXIBLE,
                 activePresetId = preset.id,
                 activePresetName = preset.name,
                 phase = TimerPhase.BREAK,
-                isRunning = false,
+                isRunning = true,
                 remainingMillis = nextBreakRemaining,
                 totalPhaseMillis = current.savedBreakTotalMillis.coerceAtLeast(fullBreakMillis),
                 savedWorkRemainingMillis = savedWork,
@@ -198,12 +200,13 @@ class TimerForegroundService : LifecycleService() {
             } else {
                 fullWorkMillis
             }
+            targetCompletionElapsedMillis = SystemClock.elapsedRealtime() + nextWorkRemaining
             _timerState.value = current.copy(
                 routineMode = RoutineMode.FLEXIBLE,
                 activePresetId = preset.id,
                 activePresetName = preset.name,
                 phase = TimerPhase.WORK,
-                isRunning = false,
+                isRunning = true,
                 remainingMillis = nextWorkRemaining,
                 totalPhaseMillis = current.savedWorkTotalMillis.coerceAtLeast(fullWorkMillis),
                 savedWorkRemainingMillis = nextWorkRemaining,
@@ -214,8 +217,10 @@ class TimerForegroundService : LifecycleService() {
             )
         }
 
-        updateOngoingNotification()
+        scheduleExactWakeup(targetCompletionElapsedMillis)
+        startForegroundWithOngoingActivity()
         FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
+        startUiTicker()
     }
 
     private fun startOrResumeTimer() {
