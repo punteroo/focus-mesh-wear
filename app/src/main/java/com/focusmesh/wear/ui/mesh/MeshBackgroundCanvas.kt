@@ -1,6 +1,8 @@
 package com.focusmesh.wear.ui.mesh
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core. FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,42 +18,59 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.focusmesh.wear.domain.model.TimerPhase
 import com.focusmesh.wear.ui.theme.PhasePalette
-import com.focusmesh.wear.ui.theme.paletteForPhase
+import com.focusmesh.wear.ui.theme.paletteForTimerState
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
-// Renders either the 3D perspective animated mesh or the 2D subtle mesh background.
-// Automatically halts animation loops when the watch enters Ambient (Always-On Display) mode to save battery.
+// Renders a full-bleed 3D perspective mesh or 2D subtle mesh that covers the entire circular watch screen.
+// Shifts color from Paused Orange into the active phase color (Red, Light Blue, Yellow) when running.
+// Halts animation completely in Ambient (Always-On Display) mode to save battery.
 @Composable
 fun MeshBackgroundCanvas(
     phase: TimerPhase,
+    isRunning: Boolean,
+    isAwaitingManualContinue: Boolean,
+    progressFraction: Float,
     mesh3dEnabled: Boolean,
     isAmbient: Boolean,
     wavePhysicsState: WavePhysicsState,
     modifier: Modifier = Modifier
 ) {
-    val targetPalette: PhasePalette = paletteForPhase(phase)
+    val targetPalette: PhasePalette = paletteForTimerState(
+        phase = phase,
+        isRunning = isRunning,
+        isAwaitingManualContinue = isAwaitingManualContinue
+    )
 
     val primaryColor by animateColorAsState(
         targetValue = targetPalette.primary,
-        animationSpec = tween(durationMillis = 700),
+        animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing),
         label = "meshPrimaryColor"
     )
     val secondaryColor by animateColorAsState(
         targetValue = targetPalette.secondary,
-        animationSpec = tween(durationMillis = 700),
+        animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing),
         label = "meshSecondaryColor"
     )
     val deepBgColor by animateColorAsState(
         targetValue = targetPalette.deepBackground,
-        animationSpec = tween(durationMillis = 700),
+        animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing),
         label = "meshDeepBgColor"
     )
 
-    var animationTimeSeconds by remember { mutableFloatStateOf(0.0f) }
+    // Smoothly transitions wave amplitude and flow speed between paused idle state and active running state.
+    val activeEnergy by animateFloatAsState(
+        targetValue = if (isRunning) 1.0f else 0.38f,
+        animationSpec = tween(durationMillis = 750, easing = FastOutSlowInEasing),
+        label = "meshActiveEnergy"
+    )
+
+    var phaseTimeSeconds by remember { mutableFloatStateOf(0.0f) }
     val trianglePath = remember { Path() }
 
     val gridSize = wavePhysicsState.gridSize
@@ -59,17 +78,21 @@ fun MeshBackgroundCanvas(
     val projectedY = remember(gridSize) { FloatArray(gridSize * gridSize) }
     val vertexElevation = remember(gridSize) { FloatArray(gridSize * gridSize) }
 
-    // Frame clock loop runs only when the watch is awake and not in Always-On Display (AOD) mode.
+    // Frame clock loop advances phase time proportional to activeEnergy so waves accelerate smoothly when started.
     LaunchedEffect(isAmbient) {
         if (isAmbient) {
             wavePhysicsState.clear()
             return@LaunchedEffect
         }
-        var startNanos = 0L
+        var lastNanos = 0L
         while (true) {
             withFrameNanos { frameNanos ->
-                if (startNanos == 0L) startNanos = frameNanos
-                animationTimeSeconds = ((frameNanos - startNanos) / 1_000_000_000.0).toFloat()
+                if (lastNanos != 0L) {
+                    val dt = ((frameNanos - lastNanos) / 1_000_000_000.0).toFloat().coerceIn(0.0f, 0.1f)
+                    val speedMultiplier = if (isRunning) 1.35f else 0.42f
+                    phaseTimeSeconds += dt * speedMultiplier
+                }
+                lastNanos = frameNanos
                 wavePhysicsState.stepSimulation()
             }
         }
@@ -82,60 +105,64 @@ fun MeshBackgroundCanvas(
         val centerY = height * 0.5f
         val radius = width.coerceAtMost(height) * 0.5f
 
-        // In Ambient mode, draw a pure black background to minimize OLED pixel power consumption.
         if (isAmbient) {
             drawRect(color = Color.Black)
         } else {
             drawRect(
                 brush = Brush.radialGradient(
-                    colors = listOf(deepBgColor, Color(0xFF050608)),
+                    colors = listOf(deepBgColor, Color(0xFF040507)),
                     center = Offset(centerX, centerY),
-                    radius = radius * 1.15f
+                    radius = radius * 1.25f
                 )
             )
         }
 
-        val t = if (isAmbient) 0.0f else animationTimeSeconds
-        val tiltRadians = if (mesh3dEnabled) 0.58f else 0.0f
+        val t = if (isAmbient) 0.0f else phaseTimeSeconds
+        // Tilt angle and frustum scale chosen so the lattice overscans 100% of the circular watch screen.
+        val tiltRadians = if (mesh3dEnabled) 0.46f else 0.0f
         val cosTilt = cos(tiltRadians)
         val sinTilt = sin(tiltRadians)
-        val cameraDistance = 2.55f
-        val scale = if (mesh3dEnabled) radius * 1.62f else radius * 1.05f
+        val cameraDistance = 2.15f
+        // Wide world span ensures the mesh edges remain outside the circular bezel even at the top horizon.
+        val worldSpan = if (mesh3dEnabled) 2.25f else 1.35f
+        val focalScale = if (mesh3dEnabled) radius * 1.75f else radius * 1.05f
 
-        // Compute 3D or 2D vertex positions across the lattice.
         for (row in 0 until gridSize) {
-            val ny = -1.0f + (2.0f * row) / (gridSize - 1)
+            val normRow = -1.0f + (2.0f * row) / (gridSize - 1)
+            val wy = normRow * worldSpan
             for (col in 0 until gridSize) {
-                val nx = -1.0f + (2.0f * col) / (gridSize - 1)
+                val normCol = -1.0f + (2.0f * col) / (gridSize - 1)
+                val wx = normCol * worldSpan
                 val idx = row * gridSize + col
                 val touchRipple = wavePhysicsState.displacementAt(row, col)
+                val radialDist = sqrt(normCol * normCol + normRow * normRow)
 
                 if (mesh3dEnabled) {
-                    val waveA = sin(nx * 3.1f + t * 1.65f) * cos(ny * 2.7f + t * 1.25f) * 0.22f
-                    val waveB = sin((nx + ny) * 2.2f - t * 1.1f) * 0.12f
-                    val z = if (isAmbient) 0.0f else (waveA + waveB + touchRipple * 0.42f)
+                    val primaryWave = sin(wx * 1.85f + t * 1.6f) * cos(wy * 1.65f - t * 1.2f) * (0.28f * activeEnergy)
+                    val radialWave = cos(radialDist * 3.8f - t * 2.1f) * (0.16f * activeEnergy)
+                    val z = if (isAmbient) 0.0f else (primaryWave + radialWave + touchRipple * 0.52f)
                     vertexElevation[idx] = z
 
-                    val rotatedY = ny * cosTilt - z * sinTilt
-                    val rotatedZ = ny * sinTilt + z * cosTilt + cameraDistance
-                    val perspective = 1.0f / rotatedZ.coerceAtLeast(0.5f)
+                    val rotatedY = wy * cosTilt - z * sinTilt
+                    val rotatedZ = (wy * sinTilt + z * cosTilt + cameraDistance).coerceAtLeast(0.65f)
+                    val invZ = 1.0f / rotatedZ
 
-                    projectedX[idx] = centerX + (nx * scale * perspective)
-                    projectedY[idx] = centerY + (rotatedY * scale * perspective)
+                    projectedX[idx] = centerX + (wx * focalScale * invZ)
+                    projectedY[idx] = centerY + (rotatedY * focalScale * invZ)
                 } else {
-                    // 2D mode uses very slight vertex drift and radial touch displacement without 3D tilt.
-                    val driftX = if (isAmbient) 0.0f else sin(ny * 2.5f + t * 0.55f) * 0.025f
-                    val driftY = if (isAmbient) 0.0f else cos(nx * 2.5f + t * 0.45f) * 0.025f
-                    val rippleOffset = touchRipple * 0.08f
-                    vertexElevation[idx] = touchRipple + (driftX + driftY) * 4.0f
+                    // 2D mode spans edge-to-edge with subtle vertex breathing and touch wave displacement.
+                    val driftX = if (isAmbient) 0.0f else sin(wy * 2.2f + t * 0.9f) * (0.045f * activeEnergy)
+                    val driftY = if (isAmbient) 0.0f else cos(wx * 2.2f - t * 0.8f) * (0.045f * activeEnergy)
+                    val rippleScale = touchRipple * 0.12f
+                    vertexElevation[idx] = touchRipple + (driftX + driftY) * 3.5f
 
-                    projectedX[idx] = centerX + (nx + driftX + nx * rippleOffset) * scale
-                    projectedY[idx] = centerY + (ny + driftY + ny * rippleOffset) * scale
+                    projectedX[idx] = centerX + (wx + driftX + normCol * rippleScale) * focalScale
+                    projectedY[idx] = centerY + (wy + driftY + normRow * rippleScale) * focalScale
                 }
             }
         }
 
-        // Draw shaded triangular mesh cells and wireframe edges.
+        // Render full-screen triangulated facets and glowing wireframe lines across the entire viewport.
         for (row in 0 until gridSize - 1) {
             for (col in 0 until gridSize - 1) {
                 val i00 = row * gridSize + col
@@ -152,16 +179,17 @@ fun MeshBackgroundCanvas(
                 val x11 = projectedX[i11]
                 val y11 = projectedY[i11]
 
-                val avgElevation = (vertexElevation[i00] + vertexElevation[i10] + vertexElevation[i01] + vertexElevation[i11]) * 0.25f
-                val elevationNorm = ((avgElevation + 0.35f) / 0.70f).coerceIn(0.0f, 1.0f)
+                val avgZ = (vertexElevation[i00] + vertexElevation[i10] + vertexElevation[i01] + vertexElevation[i11]) * 0.25f
+                val elevationNorm = ((avgZ + 0.40f) / 0.80f).coerceIn(0.0f, 1.0f)
 
                 if (!isAmbient) {
-                    val facetAlpha = if (mesh3dEnabled) {
-                        (0.08f + elevationNorm * 0.22f).coerceIn(0.05f, 0.32f)
+                    val baseFacetAlpha = if (mesh3dEnabled) {
+                        0.07f + elevationNorm * (0.14f + 0.12f * activeEnergy)
                     } else {
-                        (0.05f + elevationNorm * 0.10f).coerceIn(0.04f, 0.16f)
+                        0.05f + elevationNorm * 0.10f
                     }
-                    val facetColor = lerpColor(secondaryColor, primaryColor, elevationNorm).copy(alpha = facetAlpha)
+                    val facetColor = lerpColor(secondaryColor, primaryColor, elevationNorm)
+                        .copy(alpha = baseFacetAlpha.coerceIn(0.04f, 0.34f))
 
                     trianglePath.reset()
                     trianglePath.moveTo(x00, y00)
@@ -179,42 +207,71 @@ fun MeshBackgroundCanvas(
                 }
 
                 val lineAlpha = when {
-                    isAmbient -> 0.18f
-                    mesh3dEnabled -> (0.24f + elevationNorm * 0.48f).coerceIn(0.20f, 0.75f)
-                    else -> 0.26f
+                    isAmbient -> 0.16f
+                    mesh3dEnabled -> (0.22f + elevationNorm * (0.35f + 0.22f * activeEnergy)).coerceIn(0.18f, 0.82f)
+                    else -> (0.20f + 0.12f * activeEnergy).coerceIn(0.18f, 0.40f)
                 }
                 val lineColor = lerpColor(secondaryColor, primaryColor, elevationNorm).copy(alpha = lineAlpha)
-                val strokeWidth = if (isAmbient) 1.0f else 1.45f
+                val strokeWidth = if (isAmbient) 1.0f else (1.2f + 0.4f * activeEnergy)
 
                 drawLine(color = lineColor, start = Offset(x00, y00), end = Offset(x10, y10), strokeWidth = strokeWidth)
                 drawLine(color = lineColor, start = Offset(x00, y00), end = Offset(x01, y01), strokeWidth = strokeWidth)
                 if (mesh3dEnabled && !isAmbient) {
                     drawLine(
-                        color = lineColor.copy(alpha = lineAlpha * 0.55f),
+                        color = lineColor.copy(alpha = lineAlpha * 0.50f),
                         start = Offset(x10, y10),
                         end = Offset(x01, y01),
-                        strokeWidth = 0.9f
+                        strokeWidth = 0.85f
                     )
                 }
             }
         }
 
-        // Draw a subtle radial vignette around the watch bezel so the central timer digits remain high-contrast.
+        // Draw subtle inner depth shading and an animated progress / status ring around the watch perimeter.
         if (!isAmbient) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.32f),
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.58f)
+                    ),
                     center = Offset(centerX, centerY),
                     radius = radius
                 ),
                 radius = radius,
                 center = Offset(centerX, centerY)
             )
-            drawCircle(
-                color = primaryColor.copy(alpha = 0.35f),
-                radius = radius * 0.96f,
-                center = Offset(centerX, centerY),
-                style = Stroke(width = 2.0f)
+
+            // Subtle perimeter track and animated progress arc indicating active vs paused timer status.
+            val ringRadius = radius * 0.94f
+            val ringTopLeft = Offset(centerX - ringRadius, centerY - ringRadius)
+            val ringSize = androidx.compose.ui.geometry.Size(ringRadius * 2.0f, ringRadius * 2.0f)
+
+            drawArc(
+                color = primaryColor.copy(alpha = 0.20f),
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = ringTopLeft,
+                size = ringSize,
+                style = Stroke(width = 3.0f)
+            )
+
+            val sweep = (progressFraction.coerceIn(0.0f, 1.0f) * 360.0f)
+            val pulseAlpha = if (isRunning) {
+                0.70f + 0.25f * sin(t * 2.6f)
+            } else {
+                0.45f + 0.20f * sin(t * 1.8f)
+            }
+            drawArc(
+                color = primaryColor.copy(alpha = pulseAlpha.coerceIn(0.25f, 0.95f)),
+                startAngle = -90f,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = ringTopLeft,
+                size = ringSize,
+                style = Stroke(width = if (isRunning) 4.5f else 3.2f, cap = StrokeCap.Round)
             )
         }
     }
