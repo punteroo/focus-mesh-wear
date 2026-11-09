@@ -7,6 +7,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -331,11 +332,12 @@ class TimerForegroundService : LifecycleService() {
             }
         }
 
-        val dynamicTimerIcon = OngoingPillIconRenderer.createTimerIcon(
+        val timerBitmap = OngoingPillIconRenderer.renderTimerBitmap(
             state = state,
             readinessLabel = readinessShortLabel
         )
-        val compatTimerIcon = IconCompat.createFromIcon(this, dynamicTimerIcon)
+        val dynamicTimerIcon = Icon.createWithBitmap(timerBitmap)
+        val compatTimerIcon = IconCompat.createWithBitmap(timerBitmap)
 
         val nowElapsed = SystemClock.elapsedRealtime()
         val nowWall = System.currentTimeMillis()

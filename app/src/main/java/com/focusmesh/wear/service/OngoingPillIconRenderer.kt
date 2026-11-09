@@ -39,8 +39,8 @@ object OngoingPillIconRenderer {
         letterSpacing = -0.04f
     }
 
-    // Creates an android.graphics.drawable.Icon displaying the current remaining time and phase progress arc.
-    fun createTimerIcon(state: TimerState, readinessLabel: String): Icon {
+    // Renders a 96x96 transparent-background Bitmap displaying the current remaining time and phase progress arc.
+    fun renderTimerBitmap(state: TimerState, readinessLabel: String): Bitmap {
         val bitmap = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
@@ -64,7 +64,12 @@ object OngoingPillIconRenderer {
         val baselineY = (ICON_SIZE * 0.5f) - (fontMetrics.ascent + fontMetrics.descent) * 0.5f
         canvas.drawText(label, ICON_SIZE * 0.5f, baselineY, textPaint)
 
-        return Icon.createWithBitmap(bitmap)
+        return bitmap
+    }
+
+    // Creates an android.graphics.drawable.Icon displaying the current remaining time and phase progress arc.
+    fun createTimerIcon(state: TimerState, readinessLabel: String): Icon {
+        return Icon.createWithBitmap(renderTimerBitmap(state, readinessLabel))
     }
 
     private fun resolveRingColor(state: TimerState): Int {
