@@ -53,6 +53,24 @@
             android:name=".service.TimerAlarmReceiver"
             android:exported="false" />
 
+        <!-- Native Wear OS watch face complication provider for RANGED_VALUE, SHORT_TEXT, and LONG_TEXT slots. -->
+        <service
+            android:name=".service.FocusTimerComplicationService"
+            android:exported="true"
+            android:icon="@android:drawable/ic_lock_idle_alarm"
+            android:label="@string/complication_provider_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="RANGED_VALUE,SHORT_TEXT,LONG_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+
     </application>
 
 </manifest>

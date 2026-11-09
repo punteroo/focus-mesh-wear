@@ -75,6 +75,12 @@ dependencies {
     // Wear OS Ongoing Activity API to render the active timer pill on the One UI Watch home screen.
     implementation("androidx.wear:wear-ongoing:1.0.0")
 
+    // Wear OS Watch Face Complications API for native embeddable watch face complication slots.
+    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
+
+    // Core Material icons for native Wear OS Picker and ToggleChip controls.
+    implementation("androidx.compose.material:material-icons-core")
+
     // Wear OS ambient mode support for battery conservation during Always-On Display.
     implementation("androidx.wear:wear:1.3.0")
 
