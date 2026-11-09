@@ -6,9 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.focusmesh.wear.alerts.AlertController
 import com.focusmesh.wear.data.PreferencesRepository
-import com.focusmesh.wear.domain.model.AlertMode
-import com.focusmesh.wear.domain.model.FontChoice
-import com.focusmesh.wear.domain.model.SoundOption
 import com.focusmesh.wear.domain.model.TimerState
 import com.focusmesh.wear.domain.model.UserPreferences
 import com.focusmesh.wear.service.TimerForegroundService
@@ -34,16 +31,19 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
 
     // Dispatches a toggle or manual-continue command to the foreground service.
     fun onPrimaryAction() {
+        alertController.stopActiveSound()
         sendServiceAction(TimerForegroundService.ACTION_TOGGLE_OR_CONTINUE)
     }
 
     // Skips immediately to the next phase in the Work -> Break -> Readiness loop.
     fun onSkipPhase() {
+        alertController.stopActiveSound()
         sendServiceAction(TimerForegroundService.ACTION_SKIP_PHASE)
     }
 
     // Resets the current phase timer to its full configured duration.
     fun onResetPhase() {
+        alertController.stopActiveSound()
         sendServiceAction(TimerForegroundService.ACTION_RESET_PHASE)
     }
 
@@ -136,6 +136,15 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
 
     fun previewAlert() {
         alertController.triggerPreview(preferences.value)
+    }
+
+    fun stopPreviewSound() {
+        alertController.stopActiveSound()
+    }
+
+    override fun onCleared() {
+        alertController.stopActiveSound()
+        super.onCleared()
     }
 
     private fun sendServiceAction(action: String) {

@@ -14,6 +14,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,7 +28,7 @@ import com.focusmesh.wear.ui.screens.SettingsDrawerScreen
 import com.focusmesh.wear.ui.screens.TimerScreen
 import kotlinx.coroutines.launch
 
-// Entry activity hosting the uncluttered timer canvas and left-swipe configuration drawer.
+// Entry activity hosting the uncluttered timer canvas (Page 0) and right-side configuration drawer (Page 1).
 // Observes Wear OS Ambient Mode to halt 3D mesh animations when the watch enters Always-On Display.
 class MainActivity : ComponentActivity() {
 
@@ -69,17 +70,24 @@ class MainActivity : ComponentActivity() {
                 val preferences by viewModel.preferences.collectAsState()
                 val coroutineScope = rememberCoroutineScope()
 
-                // Page 1 is the main TimerScreen; Page 0 (to the left) is the SettingsDrawerScreen.
-                // Swiping from the left edge pulls Page 0 into view without triggering system back dismissal.
+                // Page 0 is the main TimerScreen; Page 1 (on the right side of the watch) is SettingsDrawerScreen.
+                // Swiping left (from right to left) opens Settings without conflicting with Wear OS left-edge Back.
                 val pagerState = rememberPagerState(
-                    initialPage = 1,
+                    initialPage = 0,
                     pageCount = { 2 }
                 )
 
-                // When the configuration drawer (Page 0) is open, Back returns to the main timer (Page 1).
-                BackHandler(enabled = pagerState.currentPage == 0) {
+                // Stop any active sound preview when returning from the settings drawer to the main timer.
+                LaunchedEffect(pagerState.currentPage) {
+                    if (pagerState.currentPage == 0) {
+                        viewModel.stopPreviewSound()
+                    }
+                }
+
+                // When the configuration drawer (Page 1) is open, Back returns to the main timer (Page 0).
+                BackHandler(enabled = pagerState.currentPage == 1) {
                     coroutineScope.launch {
-                        pagerState.animateScrollToPage(1)
+                        pagerState.animateScrollToPage(0)
                     }
                 }
 
@@ -89,6 +97,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize()
                 ) { page ->
                     if (page == 0) {
+                        TimerScreen(
+                            timerState = timerState,
+                            preferences = preferences,
+                            isAmbient = isAmbientState,
+                            onPrimaryTap = viewModel::onPrimaryAction,
+                            onLongPressSkip = viewModel::onSkipPhase
+                        )
+                    } else {
                         SettingsDrawerScreen(
                             preferences = preferences,
                             onToggleMesh3d = viewModel::setMesh3dEnabled,
@@ -104,14 +120,6 @@ class MainActivity : ComponentActivity() {
                             onPreviewAlert = viewModel::previewAlert,
                             onSkipPhase = viewModel::onSkipPhase,
                             onResetPhase = viewModel::onResetPhase
-                        )
-                    } else {
-                        TimerScreen(
-                            timerState = timerState,
-                            preferences = preferences,
-                            isAmbient = isAmbientState,
-                            onPrimaryTap = viewModel::onPrimaryAction,
-                            onLongPressSkip = viewModel::onSkipPhase
                         )
                     }
                 }
