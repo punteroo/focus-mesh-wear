@@ -15,22 +15,35 @@ Knowledge workers who spend long hours looking at monitors frequently experience
 - **Operating System**: Wear OS 5 / One UI Watch 6 (Android 14, API Level 34).
 - **Compatibility**: Runs standalone on any Wear OS 3.0+ watch (API 30+).
 
-## 3. Timer State Machine Requirements
+## 3. Timer State Machine & Operating Modes
 
-### 3.1 Phase and State Definitions
+### 3.1 Operating Modes & Default Presets
+- **Standard Mode (`RoutineMode.STANDARD`)**:
+  - Classic sequential cycle: **Work** expires -> transitions to **Break** in the **Paused** state -> **Break** expires -> **Readiness** -> **Work**.
+  - Default protected preset: `"Work"` (`60m` active - `15m` break).
+- **Flexible Mode (`RoutineMode.FLEXIBLE`)**:
+  - Dual-pool mode allowing the user to swap freely between **Work** and **Break** mid-session while pausing and preserving each timer's remaining countdown where the swap occurred.
+  - Default protected preset: `"Work"` (`120m` active - `45m` break).
+- **Per-Mode Custom Presets**:
+  - Each mode maintains its own list of presets with custom names (`<= 16` chars, `[A-Za-z0-9 -_]`) and `HH:MM:SS` Work/Break durations.
+  - Default presets can be edited and selected, but cannot be deleted. User-created presets can be edited and deleted.
+  - Tapping the preset label above the timer on the main screen opens a native Wear OS Preset Selector; swapping presets immediately resets the timers.
+
+### 3.2 Phase and State Definitions
 | State / Phase | Primary Color | Hex Palette | Default Duration (`HH:MM:SS`) | Behavior |
 | :--- | :--- | :--- | :--- | :--- |
 | **Paused** | Vibrant Orange | `#FF6D1A` / `#A83A00` | Indefinite while paused | Always shown when a timer is paused; shifts smoothly into the active phase color when started. |
-| **Work** | Clear Scarlet Red | `#FF4D5A` / `#D92B3A` | `01:00:00` (configurable to any `HH:MM:SS`) | Emits alert, transitions to **Break** in the **Paused** state so the user can manually start their break. |
-| **Break** | Light Sky Blue | `#38D6FF` / `#0A668E` | `00:15:00` (configurable to any `HH:MM:SS`) | Starts paused by default; once started and completed, emits alert and transitions to **Readiness**. |
-| **Readiness** | Amber Yellow | `#FFDD26` / `#9A7A00` | Manual continue (Optional grace timer: off by default, configurable `HH:MM:SS`) | Waits for user action to start **Work**. If optional grace timer is enabled and expires, emits a gentle reminder alert. |
+| **Work** | Clear Scarlet Red | `#FF4D5A` / `#D92B3A` | `01:00:00` (Standard) / `02:00:00` (Flexible) | Displays the active preset name above the clock. |
+| **Break** | Light Sky Blue | `#38D6FF` / `#0A668E` | `00:15:00` (Standard) / `00:45:00` (Flexible) | Starts paused by default; in Flexible Mode, discounts time from the Break pool and preserves remaining Break time when swapping back to Work. |
+| **Readiness** | Amber Yellow | `#FFDD26` / `#9A7A00` | Manual continue (Optional grace timer: off by default, configurable `HH:MM:SS`) | Waits for user action to replenish pools and start **Work**. |
 
-### 3.2 Controls and Interactions
-- **Center Time Element Tap**: Tapping directly on the central time readout starts, pauses, or resumes the active countdown (triggering a concentric shockwave, subtle scale/breathing transition, and color shift between **Paused Orange** and the active phase color); when in **Readiness**, a single tap begins the next **Work** cycle.
-- **Center Time Element Long Press**: Advances immediately to the next phase.
-- **Touch Drag Across Screen**: Touching or dragging anywhere outside the right-edge bezel zone deforms the full-screen 3D/2D mesh surface freely without pausing the timer or scrolling the pager.
-- **Hardware Stem Button (While App Is Open)**: Pressing a secondary hardware button while the app window is focused triggers the primary phase action without altering system-wide button assignments outside the app.
+### 3.3 Controls, Gestures, and Interactive Tutorial
+- **Preset Header Tap (Above Clock)**: Opens the native Wear OS Preset Selector for the current mode.
+- **Center Time Element Tap**: Tapping directly on the central time readout starts, pauses, or resumes the active countdown; when in **Readiness**, a single tap begins the next **Work** cycle.
+- **Center Time Element Long Press**: Advances to the next phase in Standard Mode, or swaps between Work and Break in Flexible Mode.
+- **Swipe Up Starting from Bottom Edge**: Starting a swipe on the bottom 18% edge of the watch screen and dragging up opens the **Flexible Mode** controls to toggle Flexible Mode or swap between Work and Break.
 - **Swipe Left Starting from Right Edge**: Starting a swipe on the rightmost 16% edge of the watch screen and dragging left opens the Configuration UI drawer.
+- **Interactive 4-Step Vector Tutorial**: Shown on first launch and re-openable from Settings at any time, using animated vector hand icons and motion arrows to teach right-edge settings swipe, clock tap, Wear OS complications, and bottom-edge Flexible Mode.
 
 ## 4. Visual and Typography Requirements
 

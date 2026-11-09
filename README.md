@@ -12,10 +12,12 @@ Extended screen exposure can trigger digitally induced dizziness and visual vert
 
 ## Key Features
 
-- **Uncluttered Full-Screen Timer with Custom `HH:MM:SS` Durations**:
-  - Displays the active timer directly in the center of the watch face with minimal text.
-  - Full 3-column **Hour : Minute : Second** drum picker in settings for Work, Break, and optional Readiness Grace durations.
-  - When a Work session finishes, the Break timer enters the **Paused (Orange)** state by default so you can start your no-screen break manually when ready.
+- **Standard & Flexible Modes with Per-Mode Presets**:
+  - **Standard Mode**: Classic sequential cycle with a protected default `"Work"` preset (`60m active - 15m break`). When Work finishes, Break enters the **Paused (Orange)** state so you can start your break when ready.
+  - **Flexible Mode**: Accessed by swiping up from the bottom edge of the watch (or via Settings), with a protected default `"Work"` preset (`120m active - 45m break`). Lets you swap freely between **Work** and **Break** mid-session while pausing and preserving each timer's remaining countdown.
+  - **Customizable Per-Mode Presets**: Create, edit, and delete custom presets for each mode with custom names (up to 16 characters, `[A-Za-z0-9 -_]`) and any `HH:MM:SS` Work/Break duration. Tap the preset name above the clock on the main screen to switch presets (which resets the timers). Default presets are protected from deletion.
+- **Interactive 4-Step Vector Tutorial**:
+  - Re-openable from Settings at any time, featuring animated vector hand icons and motion trails teaching right-edge Settings swipe, clock tap, Wear OS watch face complications, and bottom-edge Flexible Mode.
 - **3-Way Background Mode (`3D Mesh`, `2D Mesh`, `Solid Color`) & Battery Saver Detection**:
   - **Full-Screen 3D Mode (Default)**: An overscanned perspective-projected 3D wireframe and shaded surface mesh that fills 100% of the circular watch screen edge-to-edge.
   - **2D Subtle Mode**: A full-screen 2D lattice with gentle vertex drift.
