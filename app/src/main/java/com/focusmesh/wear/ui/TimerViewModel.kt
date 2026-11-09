@@ -6,6 +6,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.focusmesh.wear.alerts.AlertController
 import com.focusmesh.wear.data.PreferencesRepository
+import com.focusmesh.wear.domain.model.AlertMode
+import com.focusmesh.wear.domain.model.BackgroundMode
+import com.focusmesh.wear.domain.model.FontChoice
+import com.focusmesh.wear.domain.model.SoundOption
 import com.focusmesh.wear.domain.model.TimerState
 import com.focusmesh.wear.domain.model.UserPreferences
 import com.focusmesh.wear.service.TimerForegroundService
@@ -56,16 +60,21 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun cycleBackgroundMode() {
-        val next = preferences.value.backgroundMode.next()
+    fun setBackgroundMode(mode: BackgroundMode) {
         viewModelScope.launch {
-            preferencesRepository.setBackgroundMode(next)
+            preferencesRepository.setBackgroundMode(mode)
         }
     }
 
     fun setTouchWaveEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setTouchWaveEnabled(enabled)
+        }
+    }
+
+    fun setOngoingPillEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setOngoingPillEnabled(enabled)
         }
     }
 
@@ -93,25 +102,22 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun cycleFontChoice() {
-        val next = preferences.value.fontChoice.next()
+    fun setFontChoice(fontChoice: FontChoice) {
         viewModelScope.launch {
-            preferencesRepository.setFontChoice(next)
+            preferencesRepository.setFontChoice(fontChoice)
         }
     }
 
-    fun cycleAlertMode() {
-        val next = preferences.value.alertMode.next()
+    fun setAlertMode(alertMode: AlertMode) {
         viewModelScope.launch {
-            preferencesRepository.setAlertMode(next)
+            preferencesRepository.setAlertMode(alertMode)
         }
     }
 
-    fun cycleSoundOption() {
-        val next = preferences.value.soundOption.next()
+    fun setSoundOption(soundOption: SoundOption) {
         viewModelScope.launch {
-            preferencesRepository.setSoundOption(next)
-            alertController.triggerPreview(preferences.value.copy(soundOption = next))
+            preferencesRepository.setSoundOption(soundOption)
+            alertController.triggerPreview(preferences.value.copy(soundOption = soundOption))
         }
     }
 

@@ -1,6 +1,8 @@
 package com.focusmesh.wear.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,30 +11,45 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material.Button
+import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.CompactChip
+import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.InlineSlider
+import androidx.wear.compose.material.InlineSliderDefaults
+import androidx.wear.compose.material.ListHeader
+import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Picker
 import androidx.wear.compose.material.PositionIndicator
+import androidx.wear.compose.material.RadioButton
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Switch
 import androidx.wear.compose.material.Text
@@ -41,70 +58,138 @@ import androidx.wear.compose.material.rememberPickerState
 import com.focusmesh.wear.R
 import com.focusmesh.wear.domain.model.AlertMode
 import com.focusmesh.wear.domain.model.BackgroundMode
+import com.focusmesh.wear.domain.model.FontChoice
 import com.focusmesh.wear.domain.model.SoundOption
 import com.focusmesh.wear.domain.model.UserPreferences
 import com.focusmesh.wear.ui.theme.resolveGoogleFontFamily
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-private enum class ActiveDurationTarget {
-    WORK,
-    BREAK,
-    GRACE
+private sealed interface SettingsSubScreen {
+    data object WorkDuration : SettingsSubScreen
+    data object BreakDuration : SettingsSubScreen
+    data object GraceDuration : SettingsSubScreen
+    data object BackgroundSelector : SettingsSubScreen
+    data object FontSelector : SettingsSubScreen
+    data object AlertModeSelector : SettingsSubScreen
+    data object SoundSelector : SettingsSubScreen
 }
 
-// Configuration drawer revealed by swiping left from the right edge of the watch screen.
-// Includes a 3-column Hour : Minute : Second custom duration picker, live font preview, and 3-way background selector.
+// Native Wear OS configuration drawer using official Wear Compose Material primitives:
+// ScalingLazyColumn with rotary bezel scroll, ListHeader, Chip, ToggleChip with Switch/RadioButton,
+// InlineSlider with InlineSliderDefaults icons, and native 3-column Picker with circular Buttons.
 @Composable
 fun SettingsDrawerScreen(
     preferences: UserPreferences,
     isBatterySaverActive: Boolean,
-    onCycleBackgroundMode: () -> Unit,
+    onSelectBackgroundMode: (BackgroundMode) -> Unit,
     onToggleTouchWave: (Boolean) -> Unit,
+    onToggleOngoingPill: (Boolean) -> Unit,
     onToggleReadinessGrace: (Boolean) -> Unit,
     onSaveWorkDurationSeconds: (Int) -> Unit,
     onSaveBreakDurationSeconds: (Int) -> Unit,
     onSaveGraceDurationSeconds: (Int) -> Unit,
-    onCycleFont: () -> Unit,
-    onCycleAlertMode: () -> Unit,
-    onCycleSoundOption: () -> Unit,
+    onSelectFontChoice: (FontChoice) -> Unit,
+    onSelectAlertMode: (AlertMode) -> Unit,
+    onSelectSoundOption: (SoundOption) -> Unit,
     onVolumeChange: (Float) -> Unit,
     onPreviewAlert: () -> Unit,
     onSkipPhase: () -> Unit,
     onResetPhase: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var activePickerTarget by remember { mutableStateOf<ActiveDurationTarget?>(null) }
+    var activeSubScreen by remember { mutableStateOf<SettingsSubScreen?>(null) }
 
-    // If the user tapped a duration item, render the full-screen Hour : Minute : Second drum picker.
-    val currentTarget = activePickerTarget
-    if (currentTarget != null) {
-        val initialSeconds = when (currentTarget) {
-            ActiveDurationTarget.WORK -> preferences.workDurationSeconds
-            ActiveDurationTarget.BREAK -> preferences.breakDurationSeconds
-            ActiveDurationTarget.GRACE -> preferences.readinessGraceSeconds
+    // Intercept Back gesture when a native sub-menu or picker is open to return to the main Settings list.
+    BackHandler(enabled = activeSubScreen != null) {
+        activeSubScreen = null
+    }
+
+    when (activeSubScreen) {
+        SettingsSubScreen.WorkDuration -> {
+            HmsDurationPickerOverlay(
+                title = stringResource(R.string.settings_work_duration),
+                initialTotalSeconds = preferences.workDurationSeconds,
+                onConfirmSeconds = {
+                    onSaveWorkDurationSeconds(it)
+                    activeSubScreen = null
+                },
+                onCancel = { activeSubScreen = null }
+            )
+            return
         }
-        val pickerTitle = when (currentTarget) {
-            ActiveDurationTarget.WORK -> stringResource(R.string.settings_work_duration)
-            ActiveDurationTarget.BREAK -> stringResource(R.string.settings_break_duration)
-            ActiveDurationTarget.GRACE -> stringResource(R.string.settings_grace_duration)
+        SettingsSubScreen.BreakDuration -> {
+            HmsDurationPickerOverlay(
+                title = stringResource(R.string.settings_break_duration),
+                initialTotalSeconds = preferences.breakDurationSeconds,
+                onConfirmSeconds = {
+                    onSaveBreakDurationSeconds(it)
+                    activeSubScreen = null
+                },
+                onCancel = { activeSubScreen = null }
+            )
+            return
         }
-        HmsDurationPickerOverlay(
-            title = pickerTitle,
-            initialTotalSeconds = initialSeconds,
-            onConfirmSeconds = { updatedSeconds ->
-                when (currentTarget) {
-                    ActiveDurationTarget.WORK -> onSaveWorkDurationSeconds(updatedSeconds)
-                    ActiveDurationTarget.BREAK -> onSaveBreakDurationSeconds(updatedSeconds)
-                    ActiveDurationTarget.GRACE -> onSaveGraceDurationSeconds(updatedSeconds)
+        SettingsSubScreen.GraceDuration -> {
+            HmsDurationPickerOverlay(
+                title = stringResource(R.string.settings_grace_duration),
+                initialTotalSeconds = preferences.readinessGraceSeconds,
+                onConfirmSeconds = {
+                    onSaveGraceDurationSeconds(it)
+                    activeSubScreen = null
+                },
+                onCancel = { activeSubScreen = null }
+            )
+            return
+        }
+        SettingsSubScreen.BackgroundSelector -> {
+            NativeBackgroundModeSelectorScreen(
+                selectedMode = preferences.backgroundMode,
+                onSelectMode = {
+                    onSelectBackgroundMode(it)
+                    activeSubScreen = null
                 }
-                activePickerTarget = null
-            },
-            onCancel = { activePickerTarget = null }
-        )
-        return
+            )
+            return
+        }
+        SettingsSubScreen.FontSelector -> {
+            NativeFontSelectorScreen(
+                selectedFont = preferences.fontChoice,
+                onSelectFont = {
+                    onSelectFontChoice(it)
+                    activeSubScreen = null
+                }
+            )
+            return
+        }
+        SettingsSubScreen.AlertModeSelector -> {
+            NativeAlertModeSelectorScreen(
+                selectedMode = preferences.alertMode,
+                onSelectMode = {
+                    onSelectAlertMode(it)
+                    activeSubScreen = null
+                }
+            )
+            return
+        }
+        SettingsSubScreen.SoundSelector -> {
+            NativeSoundOptionSelectorScreen(
+                selectedSound = preferences.soundOption,
+                onSelectSound = { onSelectSoundOption(it) }
+            )
+            return
+        }
+        null -> Unit
     }
 
     val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     val previewFontFamily = remember(preferences.fontChoice) {
         resolveGoogleFontFamily(preferences.fontChoice)
     }
@@ -132,33 +217,32 @@ fun SettingsDrawerScreen(
 
     Scaffold(
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFF0A0C10))
+        modifier = modifier.fillMaxSize()
     ) {
         ScalingLazyColumn(
             state = listState,
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp)
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch {
+                        listState.scrollBy(event.verticalScrollPixels)
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
         ) {
             item {
-                Text(
-                    text = stringResource(R.string.settings_title),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 6.dp)
-                )
+                ListHeader {
+                    Text(text = stringResource(R.string.settings_title))
+                }
             }
 
             // Custom Work Duration (Hour : Minute : Second granularity).
             item {
                 Chip(
-                    onClick = { activePickerTarget = ActiveDurationTarget.WORK },
+                    onClick = { activeSubScreen = SettingsSubScreen.WorkDuration },
                     label = { Text(text = stringResource(R.string.settings_work_duration)) },
                     secondaryLabel = {
                         Text(text = UserPreferences.formatSecondsAsHms(preferences.workDurationSeconds))
@@ -171,7 +255,7 @@ fun SettingsDrawerScreen(
             // Custom Break Duration (Hour : Minute : Second granularity).
             item {
                 Chip(
-                    onClick = { activePickerTarget = ActiveDurationTarget.BREAK },
+                    onClick = { activeSubScreen = SettingsSubScreen.BreakDuration },
                     label = { Text(text = stringResource(R.string.settings_break_duration)) },
                     secondaryLabel = {
                         Text(text = UserPreferences.formatSecondsAsHms(preferences.breakDurationSeconds))
@@ -201,7 +285,7 @@ fun SettingsDrawerScreen(
             if (preferences.readinessGraceEnabled) {
                 item {
                     Chip(
-                        onClick = { activePickerTarget = ActiveDurationTarget.GRACE },
+                        onClick = { activeSubScreen = SettingsSubScreen.GraceDuration },
                         label = { Text(text = stringResource(R.string.settings_grace_duration)) },
                         secondaryLabel = {
                             Text(text = UserPreferences.formatSecondsAsHms(preferences.readinessGraceSeconds))
@@ -212,10 +296,35 @@ fun SettingsDrawerScreen(
                 }
             }
 
-            // 3-way Background Mode selector (3D Mesh, 2D Mesh, Solid Color) with Battery Saver status.
+            // Toggle for the bottom Watch Face OngoingActivity pill ("Now" indicator), allowing users to
+            // choose either the bottom pill, the native Watch Face Complication, or both.
+            item {
+                ToggleChip(
+                    checked = preferences.ongoingPillEnabled,
+                    onCheckedChange = onToggleOngoingPill,
+                    label = {
+                        Text(
+                            text = stringResource(R.string.settings_ongoing_pill),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    secondaryLabel = {
+                        Text(
+                            text = stringResource(R.string.settings_ongoing_pill_desc),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    toggleControl = { Switch(checked = preferences.ongoingPillEnabled) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // 3-way Background Mode selector opening a native Wear OS radio list.
             item {
                 Chip(
-                    onClick = onCycleBackgroundMode,
+                    onClick = { activeSubScreen = SettingsSubScreen.BackgroundSelector },
                     label = { Text(text = stringResource(R.string.settings_bg_mode)) },
                     secondaryLabel = {
                         Text(
@@ -251,10 +360,10 @@ fun SettingsDrawerScreen(
                 }
             }
 
-            // Font Family selector with live inline typography preview.
+            // Font Family selector opening a native Wear OS radio list with live per-font typography preview.
             item {
                 Chip(
-                    onClick = onCycleFont,
+                    onClick = { activeSubScreen = SettingsSubScreen.FontSelector },
                     label = {
                         Text(
                             text = "${stringResource(R.string.settings_font_label)}: ${preferences.fontChoice.displayName}",
@@ -268,9 +377,7 @@ fun SettingsDrawerScreen(
                             style = TextStyle(
                                 fontFamily = previewFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                letterSpacing = 1.0.sp,
-                                color = Color(0xFFFF6D1A)
+                                fontSize = 14.sp
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -281,10 +388,10 @@ fun SettingsDrawerScreen(
                 )
             }
 
-            // Alert mode selector.
+            // Alert mode selector opening a native Wear OS radio list.
             item {
                 Chip(
-                    onClick = onCycleAlertMode,
+                    onClick = { activeSubScreen = SettingsSubScreen.AlertModeSelector },
                     label = { Text(text = stringResource(R.string.settings_alert_mode)) },
                     secondaryLabel = { Text(text = alertModeLabel) },
                     colors = ChipDefaults.secondaryChipColors(),
@@ -292,10 +399,10 @@ fun SettingsDrawerScreen(
                 )
             }
 
-            // Non-robotic acoustic sound preset selector.
+            // Non-robotic acoustic sound preset selector opening a native Wear OS radio list.
             item {
                 Chip(
-                    onClick = onCycleSoundOption,
+                    onClick = { activeSubScreen = SettingsSubScreen.SoundSelector },
                     label = { Text(text = stringResource(R.string.settings_sound_option)) },
                     secondaryLabel = { Text(text = soundOptionLabel) },
                     colors = ChipDefaults.secondaryChipColors(),
@@ -303,17 +410,16 @@ fun SettingsDrawerScreen(
                 )
             }
 
-            // Independent alarm volume slider.
+            // Independent alarm volume header and native InlineSlider.
             item {
-                Text(
-                    text = stringResource(
-                        R.string.settings_volume,
-                        (preferences.alertVolume * 100f).roundToInt()
-                    ),
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                ListHeader {
+                    Text(
+                        text = stringResource(
+                            R.string.settings_volume,
+                            (preferences.alertVolume * 100f).roundToInt()
+                        )
+                    )
+                }
             }
 
             item {
@@ -322,8 +428,18 @@ fun SettingsDrawerScreen(
                     onValueChange = onVolumeChange,
                     valueRange = 0.0f..1.0f,
                     steps = 9,
-                    decreaseIcon = { Text(text = "-", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
-                    increaseIcon = { Text(text = "+", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+                    decreaseIcon = {
+                        Icon(
+                            imageVector = InlineSliderDefaults.Decrease,
+                            contentDescription = null
+                        )
+                    },
+                    increaseIcon = {
+                        Icon(
+                            imageVector = InlineSliderDefaults.Increase,
+                            contentDescription = null
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -333,7 +449,7 @@ fun SettingsDrawerScreen(
                 Chip(
                     onClick = onPreviewAlert,
                     label = { Text(text = stringResource(R.string.settings_test_alert)) },
-                    colors = ChipDefaults.primaryChipColors(backgroundColor = Color(0xFF1F6FEB)),
+                    colors = ChipDefaults.primaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -360,7 +476,221 @@ fun SettingsDrawerScreen(
     }
 }
 
-// Full-screen Wear OS 3-column drum picker allowing the user to dial in any exact Hour, Minute, and Second.
+@Composable
+private fun NativeBackgroundModeSelectorScreen(
+    selectedMode: BackgroundMode,
+    onSelectMode: (BackgroundMode) -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.settings_bg_mode))
+                }
+            }
+            items(BackgroundMode.entries) { mode ->
+                val label = when (mode) {
+                    BackgroundMode.MESH_3D -> stringResource(R.string.bg_mode_3d)
+                    BackgroundMode.MESH_2D -> stringResource(R.string.bg_mode_2d)
+                    BackgroundMode.SOLID_COLOR -> stringResource(R.string.bg_mode_solid)
+                }
+                val isSelected = mode == selectedMode
+                ToggleChip(
+                    checked = isSelected,
+                    onCheckedChange = { onSelectMode(mode) },
+                    label = { Text(text = label) },
+                    toggleControl = { RadioButton(selected = isSelected) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NativeFontSelectorScreen(
+    selectedFont: FontChoice,
+    onSelectFont: (FontChoice) -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.settings_font_label))
+                }
+            }
+            items(FontChoice.entries) { font ->
+                val fontFamily = remember(font) { resolveGoogleFontFamily(font) }
+                val isSelected = font == selectedFont
+                ToggleChip(
+                    checked = isSelected,
+                    onCheckedChange = { onSelectFont(font) },
+                    label = {
+                        Text(
+                            text = font.displayName,
+                            style = TextStyle(
+                                fontFamily = fontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        )
+                    },
+                    secondaryLabel = {
+                        Text(
+                            text = stringResource(R.string.settings_font_preview_sample),
+                            style = TextStyle(
+                                fontFamily = fontFamily,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp
+                            )
+                        )
+                    },
+                    toggleControl = { RadioButton(selected = isSelected) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NativeAlertModeSelectorScreen(
+    selectedMode: AlertMode,
+    onSelectMode: (AlertMode) -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.settings_alert_mode))
+                }
+            }
+            items(AlertMode.entries) { mode ->
+                val label = when (mode) {
+                    AlertMode.SOUND_AND_HAPTICS -> stringResource(R.string.alert_mode_all)
+                    AlertMode.SOUND_ONLY -> stringResource(R.string.alert_mode_sound)
+                    AlertMode.HAPTICS_ONLY -> stringResource(R.string.alert_mode_haptics)
+                    AlertMode.NONE -> stringResource(R.string.alert_mode_none)
+                }
+                val isSelected = mode == selectedMode
+                ToggleChip(
+                    checked = isSelected,
+                    onCheckedChange = { onSelectMode(mode) },
+                    label = { Text(text = label) },
+                    toggleControl = { RadioButton(selected = isSelected) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NativeSoundOptionSelectorScreen(
+    selectedSound: SoundOption,
+    onSelectSound: (SoundOption) -> Unit
+) {
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.settings_sound_option))
+                }
+            }
+            items(SoundOption.entries) { sound ->
+                val label = when (sound) {
+                    SoundOption.SINGING_BOWL -> stringResource(R.string.sound_singing_bowl)
+                    SoundOption.WARM_MARIMBA -> stringResource(R.string.sound_warm_marimba)
+                    SoundOption.CRYSTAL_CHIME -> stringResource(R.string.sound_crystal_chime)
+                    SoundOption.SOFT_GONG -> stringResource(R.string.sound_soft_gong)
+                    SoundOption.SYSTEM_ALARM -> stringResource(R.string.sound_system_alarm)
+                }
+                val isSelected = sound == selectedSound
+                ToggleChip(
+                    checked = isSelected,
+                    onCheckedChange = { onSelectSound(sound) },
+                    label = { Text(text = label) },
+                    toggleControl = { RadioButton(selected = isSelected) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+// Full-screen Wear OS 3-column drum picker using native Picker and circular Wear OS Button controls.
 @Composable
 private fun HmsDurationPickerOverlay(
     title: String,
@@ -391,14 +721,11 @@ private fun HmsDurationPickerOverlay(
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0C10))
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Text(
             text = title,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.9f),
+            style = MaterialTheme.typography.caption2,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -412,15 +739,14 @@ private fun HmsDurationPickerOverlay(
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            // Hours column (00 to 23).
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = stringResource(R.string.picker_hours),
-                    fontSize = 9.sp,
-                    color = Color(0xFFFF6D1A)
+                    style = MaterialTheme.typography.caption3,
+                    color = MaterialTheme.colors.primary
                 )
                 Picker(
                     state = hoursState,
@@ -429,30 +755,25 @@ private fun HmsDurationPickerOverlay(
                 ) { hour ->
                     Text(
                         text = String.format("%02d", hour),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (hour == hoursState.selectedOption) Color.White else Color.Gray
+                        style = MaterialTheme.typography.display3
                     )
                 }
             }
 
             Text(
                 text = ":",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(top = 10.dp)
+                style = MaterialTheme.typography.display3,
+                modifier = Modifier.padding(top = 12.dp)
             )
 
-            // Minutes column (00 to 59).
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = stringResource(R.string.picker_minutes),
-                    fontSize = 9.sp,
-                    color = Color(0xFFFF6D1A)
+                    style = MaterialTheme.typography.caption3,
+                    color = MaterialTheme.colors.primary
                 )
                 Picker(
                     state = minutesState,
@@ -461,30 +782,25 @@ private fun HmsDurationPickerOverlay(
                 ) { minute ->
                     Text(
                         text = String.format("%02d", minute),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (minute == minutesState.selectedOption) Color.White else Color.Gray
+                        style = MaterialTheme.typography.display3
                     )
                 }
             }
 
             Text(
                 text = ":",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(top = 10.dp)
+                style = MaterialTheme.typography.display3,
+                modifier = Modifier.padding(top = 12.dp)
             )
 
-            // Seconds column (00 to 59).
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = stringResource(R.string.picker_seconds),
-                    fontSize = 9.sp,
-                    color = Color(0xFFFF6D1A)
+                    style = MaterialTheme.typography.caption3,
+                    color = MaterialTheme.colors.primary
                 )
                 Picker(
                     state = secondsState,
@@ -493,34 +809,44 @@ private fun HmsDurationPickerOverlay(
                 ) { second ->
                     Text(
                         text = String.format("%02d", second),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (second == secondsState.selectedOption) Color.White else Color.Gray
+                        style = MaterialTheme.typography.display3
                     )
                 }
             }
         }
 
+        Spacer(modifier = Modifier.height(4.dp))
+
         Row(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CompactChip(
+            Button(
                 onClick = onCancel,
-                label = { Text(text = stringResource(R.string.picker_cancel), fontSize = 11.sp) },
-                colors = ChipDefaults.secondaryChipColors()
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            CompactChip(
+                colors = ButtonDefaults.secondaryButtonColors(),
+                modifier = Modifier.size(ButtonDefaults.SmallButtonSize)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.picker_cancel)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Button(
                 onClick = {
                     val total = (hoursState.selectedOption * 3600) +
                         (minutesState.selectedOption * 60) +
                         secondsState.selectedOption
                     onConfirmSeconds(total.coerceAtLeast(1))
                 },
-                label = { Text(text = stringResource(R.string.picker_save), fontSize = 11.sp) },
-                colors = ChipDefaults.primaryChipColors(backgroundColor = Color(0xFFFF6D1A))
-            )
+                colors = ButtonDefaults.primaryButtonColors(),
+                modifier = Modifier.size(ButtonDefaults.SmallButtonSize)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = stringResource(R.string.picker_save)
+                )
+            }
         }
     }
 }
