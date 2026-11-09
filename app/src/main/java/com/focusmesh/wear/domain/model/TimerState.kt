@@ -35,6 +35,21 @@ data class TimerState(
         }
     }
 
+    // Formats the remaining time in minute granularity for Wear OS Always-On Display (Ambient Mode)
+    // where the display hardware refreshes once per minute via onUpdateAmbient().
+    fun formattedAmbientTime(): String {
+        val clamped = remainingMillis.coerceAtLeast(0L)
+        if (clamped == 0L) return "0m"
+        val totalMinutes = (clamped + 59_999L) / 60_000L
+        val hours = totalMinutes / 60L
+        val minutes = totalMinutes % 60L
+        return if (hours > 0L) {
+            String.format("%dh %02dm", hours, minutes)
+        } else {
+            String.format("%dm", minutes)
+        }
+    }
+
     // Computes normalized progress between 0.0f and 1.0f for perimeter ring and mesh scaling.
     fun progressFraction(): Float {
         if (totalPhaseMillis <= 0L) return 1.0f
