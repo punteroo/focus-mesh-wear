@@ -29,7 +29,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 // Foreground service maintaining the continuous Work -> Break -> Readiness cycle.
-// Publishes a Wear OS OngoingActivity so One UI Watch renders the floating status island on the watch face.
+// Publishes a Wear OS OngoingActivity with both TimerPart and Chronometer metadata so One UI Watch
+// renders the live countdown time inside the home screen pill.
 class TimerForegroundService : LifecycleService() {
 
     private lateinit var preferencesRepository: PreferencesRepository
@@ -40,6 +41,7 @@ class TimerForegroundService : LifecycleService() {
     private var latestPreferences = UserPreferences()
     private var tickerJob: Job? = null
     private var targetCompletionElapsedMillis: Long = 0L
+    private var lastNotificationSecond: Long = -1L
 
     override fun onCreate() {
         super.onCreate()
@@ -54,7 +56,6 @@ class TimerForegroundService : LifecycleService() {
             preferencesRepository.preferencesFlow.collectLatest { prefs ->
                 val oldPrefs = latestPreferences
                 latestPreferences = prefs
-                // If the timer is idle at the start of a phase, sync the displayed duration with updated settings.
                 val current = _timerState.value
                 if (!current.isRunning && current.remainingMillis == current.totalPhaseMillis) {
                     val updatedTotal = phaseDurationMillis(current.phase, prefs)
@@ -81,11 +82,10 @@ class TimerForegroundService : LifecycleService() {
         return START_STICKY
     }
 
-    // Handles single-tap or hardware stem button press depending on the active phase.
+    // Handles tap on the central time element or hardware stem button press depending on the active phase.
     private fun handlePrimaryAction() {
         val current = _timerState.value
         if (current.phase == TimerPhase.READINESS) {
-            // In Readiness, manual confirmation starts the next 60-minute Work focus block immediately.
             enterPhase(TimerPhase.WORK, autoStart = true, triggerAlerts = true)
             return
         }
@@ -143,7 +143,6 @@ class TimerForegroundService : LifecycleService() {
     private fun onExactAlarmExpired() {
         val current = _timerState.value
         if (current.phase == TimerPhase.READINESS && latestPreferences.readinessGraceEnabled) {
-            // When the optional Readiness grace timer expires, emit a reminder alert and hold for manual start.
             tickerJob?.cancel()
             alertController.triggerPhaseAlert(TimerPhase.READINESS, latestPreferences)
             _timerState.value = current.copy(
@@ -162,7 +161,6 @@ class TimerForegroundService : LifecycleService() {
         val shouldAutoStart = when (next) {
             TimerPhase.WORK -> true
             TimerPhase.BREAK -> true
-            // Readiness requires manual continue unless the optional grace countdown is enabled.
             TimerPhase.READINESS -> latestPreferences.readinessGraceEnabled
         }
         enterPhase(next, autoStart = shouldAutoStart, triggerAlerts = triggerAlerts)
@@ -205,11 +203,17 @@ class TimerForegroundService : LifecycleService() {
 
     private fun startUiTicker() {
         tickerJob?.cancel()
+        lastNotificationSecond = -1L
         tickerJob = lifecycleScope.launch {
             while (_timerState.value.isRunning) {
                 val now = SystemClock.elapsedRealtime()
                 val remaining = (targetCompletionElapsedMillis - now).coerceAtLeast(0L)
                 _timerState.value = _timerState.value.copy(remainingMillis = remaining)
+                val currentSecond = (remaining + 999L) / 1000L
+                if (currentSecond != lastNotificationSecond) {
+                    lastNotificationSecond = currentSecond
+                    updateOngoingNotification()
+                }
                 if (remaining <= 0L) {
                     onExactAlarmExpired()
                     break
@@ -264,10 +268,12 @@ class TimerForegroundService : LifecycleService() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_HIGH
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = getString(R.string.notification_channel_desc)
             setBypassDnd(true)
+            setSound(null, null)
+            enableVibration(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         notificationManager.createNotificationChannel(channel)
@@ -283,7 +289,8 @@ class TimerForegroundService : LifecycleService() {
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-    // Builds the notification and attaches a Wear OS OngoingActivity for the One UI Watch home screen island.
+    // Builds the notification and attaches a Wear OS OngoingActivity with TimerPart and Chronometer metadata
+    // so One UI Watch displays the live MM:SS countdown inside the watch face pill.
     private fun buildOngoingNotification(): Notification {
         val state = _timerState.value
         val launchIntent = Intent(this, MainActivity::class.java).apply {
@@ -296,38 +303,68 @@ class TimerForegroundService : LifecycleService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val formattedTime = state.formattedTime()
         val statusText = when (state.phase) {
-            TimerPhase.WORK -> getString(R.string.ongoing_work_status, state.formattedTime())
-            TimerPhase.BREAK -> getString(R.string.ongoing_break_status, state.formattedTime())
-            TimerPhase.READINESS -> getString(R.string.ongoing_readiness_status)
+            TimerPhase.WORK -> getString(R.string.ongoing_work_status, formattedTime)
+            TimerPhase.BREAK -> getString(R.string.ongoing_break_status, formattedTime)
+            TimerPhase.READINESS -> if (state.totalPhaseMillis > 0L) {
+                formattedTime
+            } else {
+                getString(R.string.ongoing_readiness_status)
+            }
         }
+
+        val nowElapsed = SystemClock.elapsedRealtime()
+        val nowWall = System.currentTimeMillis()
+        val hasCountdown = state.remainingMillis > 0L
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(getString(R.string.app_name))
+            .setContentTitle(formattedTime)
             .setContentText(statusText)
+            .setSubText(formattedTime)
             .setContentIntent(contentPendingIntent)
             .setOngoing(true)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
-        val ongoingStatus = if (state.isRunning && state.remainingMillis > 0L) {
-            Status.Builder()
-                .addTemplate("#phase# #time#")
-                .addPart("phase", Status.TextPart(state.phase.name))
-                .addPart("time", Status.TimerPart(SystemClock.elapsedRealtime() + state.remainingMillis))
-                .build()
+        if (state.isRunning && hasCountdown) {
+            builder
+                .setWhen(nowWall + state.remainingMillis)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
         } else {
-            Status.Builder()
-                .addTemplate("#status#")
-                .addPart("status", Status.TextPart(statusText))
-                .build()
+            builder
+                .setShowWhen(false)
+                .setUsesChronometer(false)
+        }
+
+        // Use a direct single-part TimerPart when counting down so One UI Watch renders the MM:SS timer in the pill.
+        val ongoingStatus = when {
+            state.isRunning && hasCountdown -> {
+                Status.forPart(Status.TimerPart(nowElapsed + state.remainingMillis))
+            }
+            !state.isRunning && hasCountdown -> {
+                Status.forPart(
+                    Status.TimerPart(
+                        nowElapsed + state.remainingMillis,
+                        nowElapsed
+                    )
+                )
+            }
+            else -> {
+                Status.forPart(Status.TextPart(getString(R.string.phase_readiness)))
+            }
         }
 
         val ongoingActivity = OngoingActivity.Builder(applicationContext, NOTIFICATION_ID, builder)
             .setAnimatedIcon(android.R.drawable.ic_lock_idle_alarm)
             .setStaticIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setTitle(formattedTime)
             .setTouchIntent(contentPendingIntent)
             .setStatus(ongoingStatus)
             .build()
@@ -342,7 +379,7 @@ class TimerForegroundService : LifecycleService() {
         const val ACTION_RESET_PHASE = "com.focusmesh.wear.action.RESET_PHASE"
         const val ACTION_ALARM_EXPIRED = "com.focusmesh.wear.action.ALARM_EXPIRED"
 
-        private const val CHANNEL_ID = "focus_mesh_alarm_channel"
+        private const val CHANNEL_ID = "focus_mesh_ongoing_channel"
         private const val NOTIFICATION_ID = 1001
         private const val ALARM_REQUEST_CODE = 2001
 
