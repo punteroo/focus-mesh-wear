@@ -16,7 +16,9 @@ data class UserPreferences(
     val alertMode: AlertMode = AlertMode.SOUND_AND_HAPTICS,
     val soundOption: SoundOption = SoundOption.SINGING_BOWL,
     // Normalized volume level between 0.0f and 1.0f applied to the alarm audio stream output.
-    val alertVolume: Float = 0.85f
+    val alertVolume: Float = 0.85f,
+    // Controls whether the bottom Watch Face OngoingActivity pill ("Now" icon) is registered.
+    val ongoingPillEnabled: Boolean = true
 ) {
     companion object {
         // Formats a total number of seconds as HH:MM:SS for the settings summary chips.
