@@ -34,6 +34,7 @@ class PreferencesRepository(private val context: Context) {
         val ALERT_MODE = stringPreferencesKey("alert_mode")
         val SOUND_OPTION = stringPreferencesKey("sound_option")
         val ALERT_VOLUME = floatPreferencesKey("alert_volume")
+        val ONGOING_PILL_ENABLED = booleanPreferencesKey("ongoing_pill_enabled")
     }
 
     // Reactive stream emitting the latest UserPreferences whenever any setting changes.
@@ -56,7 +57,8 @@ class PreferencesRepository(private val context: Context) {
             soundOption = runCatching {
                 SoundOption.valueOf(prefs[Keys.SOUND_OPTION] ?: SoundOption.SINGING_BOWL.name)
             }.getOrDefault(SoundOption.SINGING_BOWL),
-            alertVolume = (prefs[Keys.ALERT_VOLUME] ?: 0.85f).coerceIn(0.0f, 1.0f)
+            alertVolume = (prefs[Keys.ALERT_VOLUME] ?: 0.85f).coerceIn(0.0f, 1.0f),
+            ongoingPillEnabled = prefs[Keys.ONGOING_PILL_ENABLED] ?: true
         )
     }
 
@@ -98,5 +100,9 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setAlertVolume(volume: Float) {
         context.dataStore.edit { it[Keys.ALERT_VOLUME] = volume.coerceIn(0.0f, 1.0f) }
+    }
+
+    suspend fun setOngoingPillEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.ONGOING_PILL_ENABLED] = enabled }
     }
 }
