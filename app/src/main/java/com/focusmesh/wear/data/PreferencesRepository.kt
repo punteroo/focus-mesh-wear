@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.focusmesh.wear.domain.model.AlertMode
+import com.focusmesh.wear.domain.model.BackgroundMode
 import com.focusmesh.wear.domain.model.FontChoice
 import com.focusmesh.wear.domain.model.SoundOption
 import com.focusmesh.wear.domain.model.UserPreferences
@@ -23,11 +24,11 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class PreferencesRepository(private val context: Context) {
 
     private object Keys {
-        val WORK_MINUTES = intPreferencesKey("work_minutes")
-        val BREAK_MINUTES = intPreferencesKey("break_minutes")
+        val WORK_SECONDS = intPreferencesKey("work_seconds")
+        val BREAK_SECONDS = intPreferencesKey("break_seconds")
         val READINESS_GRACE_ENABLED = booleanPreferencesKey("readiness_grace_enabled")
-        val READINESS_GRACE_MINUTES = intPreferencesKey("readiness_grace_minutes")
-        val MESH_3D_ENABLED = booleanPreferencesKey("mesh_3d_enabled")
+        val READINESS_GRACE_SECONDS = intPreferencesKey("readiness_grace_seconds")
+        val BACKGROUND_MODE = stringPreferencesKey("background_mode")
         val TOUCH_WAVE_ENABLED = booleanPreferencesKey("touch_wave_enabled")
         val FONT_CHOICE = stringPreferencesKey("font_choice")
         val ALERT_MODE = stringPreferencesKey("alert_mode")
@@ -38,11 +39,13 @@ class PreferencesRepository(private val context: Context) {
     // Reactive stream emitting the latest UserPreferences whenever any setting changes.
     val preferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
-            workDurationMinutes = prefs[Keys.WORK_MINUTES] ?: 60,
-            breakDurationMinutes = prefs[Keys.BREAK_MINUTES] ?: 15,
+            workDurationSeconds = (prefs[Keys.WORK_SECONDS] ?: 3600).coerceIn(1, 86399),
+            breakDurationSeconds = (prefs[Keys.BREAK_SECONDS] ?: 900).coerceIn(1, 86399),
             readinessGraceEnabled = prefs[Keys.READINESS_GRACE_ENABLED] ?: false,
-            readinessGraceMinutes = prefs[Keys.READINESS_GRACE_MINUTES] ?: 5,
-            mesh3dEnabled = prefs[Keys.MESH_3D_ENABLED] ?: true,
+            readinessGraceSeconds = (prefs[Keys.READINESS_GRACE_SECONDS] ?: 300).coerceIn(1, 86399),
+            backgroundMode = runCatching {
+                BackgroundMode.valueOf(prefs[Keys.BACKGROUND_MODE] ?: BackgroundMode.MESH_3D.name)
+            }.getOrDefault(BackgroundMode.MESH_3D),
             touchWaveEnabled = prefs[Keys.TOUCH_WAVE_ENABLED] ?: true,
             fontChoice = runCatching {
                 FontChoice.valueOf(prefs[Keys.FONT_CHOICE] ?: FontChoice.SPACE_GROTESK.name)
@@ -57,24 +60,24 @@ class PreferencesRepository(private val context: Context) {
         )
     }
 
-    suspend fun setWorkDurationMinutes(minutes: Int) {
-        context.dataStore.edit { it[Keys.WORK_MINUTES] = minutes.coerceIn(5, 180) }
+    suspend fun setWorkDurationSeconds(totalSeconds: Int) {
+        context.dataStore.edit { it[Keys.WORK_SECONDS] = totalSeconds.coerceIn(1, 86399) }
     }
 
-    suspend fun setBreakDurationMinutes(minutes: Int) {
-        context.dataStore.edit { it[Keys.BREAK_MINUTES] = minutes.coerceIn(1, 60) }
+    suspend fun setBreakDurationSeconds(totalSeconds: Int) {
+        context.dataStore.edit { it[Keys.BREAK_SECONDS] = totalSeconds.coerceIn(1, 86399) }
     }
 
     suspend fun setReadinessGraceEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.READINESS_GRACE_ENABLED] = enabled }
     }
 
-    suspend fun setReadinessGraceMinutes(minutes: Int) {
-        context.dataStore.edit { it[Keys.READINESS_GRACE_MINUTES] = minutes.coerceIn(1, 30) }
+    suspend fun setReadinessGraceSeconds(totalSeconds: Int) {
+        context.dataStore.edit { it[Keys.READINESS_GRACE_SECONDS] = totalSeconds.coerceIn(1, 86399) }
     }
 
-    suspend fun setMesh3dEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.MESH_3D_ENABLED] = enabled }
+    suspend fun setBackgroundMode(mode: BackgroundMode) {
+        context.dataStore.edit { it[Keys.BACKGROUND_MODE] = mode.name }
     }
 
     suspend fun setTouchWaveEnabled(enabled: Boolean) {
