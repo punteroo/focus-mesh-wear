@@ -22,10 +22,12 @@ Knowledge workers who spend long hours looking at monitors frequently experience
   - Classic sequential cycle: **Work** expires -> transitions to **Break** in the **Paused** state -> **Break** expires -> **Readiness** -> **Work**.
   - Default protected preset: `"Work"` (`60m` active - `15m` break).
 - **Flexible Mode (`RoutineMode.FLEXIBLE`)**:
-  - Dual-pool mode allowing the user to swap freely between **Work** and **Break** mid-session while pausing and preserving each timer's remaining countdown where the swap occurred.
+  - Interchangeable full-screen timer mode accessed by pulling down or swiping up vertically on the main screen (mode switching is exclusively via vertical swipe, not from Settings).
+  - Visually distinguished by dual concentric bezel progress rings (outer active ring + inner standby ring), an inverted 3D mesh camera horizon, and a bordered `FLEXIBLE` capsule displaying the standby pool's remaining countdown.
+  - Long-tapping the central clock swaps between **Work** and **Break** mid-session, saving and pausing the outgoing timer's count while **automatically unpausing** the swapped-in timer if it was paused.
   - Default protected preset: `"Work"` (`120m` active - `45m` break).
 - **Per-Mode Custom Presets**:
-  - Each mode maintains its own list of presets with custom names (`<= 16` chars, `[A-Za-z0-9 -_]`) and `HH:MM:SS` Work/Break durations.
+  - Each mode maintains its own list of presets with custom names (`<= 16` chars, `[A-Za-z0-9 -_]`) and `HH:MM:SS` Work/Break durations, configurable in dedicated Settings sub-sections (**Standard Mode Presets** and **Flexible Mode Presets**).
   - Default presets can be edited and selected, but cannot be deleted. User-created presets can be edited and deleted.
   - Tapping the preset label above the timer on the main screen opens a native Wear OS Preset Selector; swapping presets immediately resets the timers.
 
@@ -34,16 +36,16 @@ Knowledge workers who spend long hours looking at monitors frequently experience
 | :--- | :--- | :--- | :--- | :--- |
 | **Paused** | Vibrant Orange | `#FF6D1A` / `#A83A00` | Indefinite while paused | Always shown when a timer is paused; shifts smoothly into the active phase color when started. |
 | **Work** | Clear Scarlet Red | `#FF4D5A` / `#D92B3A` | `01:00:00` (Standard) / `02:00:00` (Flexible) | Displays the active preset name above the clock. |
-| **Break** | Light Sky Blue | `#38D6FF` / `#0A668E` | `00:15:00` (Standard) / `00:45:00` (Flexible) | Starts paused by default; in Flexible Mode, discounts time from the Break pool and preserves remaining Break time when swapping back to Work. |
+| **Break** | Light Sky Blue | `#38D6FF` / `#0A668E` | `00:15:00` (Standard) / `00:45:00` (Flexible) | Starts paused by default in Standard Mode; in Flexible Mode, long-tap swaps between Work and Break and automatically unpauses the swapped-in pool. |
 | **Readiness** | Amber Yellow | `#FFDD26` / `#9A7A00` | Manual continue (Optional grace timer: off by default, configurable `HH:MM:SS`) | Waits for user action to replenish pools and start **Work**. |
 
 ### 3.3 Controls, Gestures, and Interactive Tutorial
 - **Preset Header Tap (Above Clock)**: Opens the native Wear OS Preset Selector for the current mode.
-- **Center Time Element Tap**: Tapping directly on the central time readout starts, pauses, or resumes the active countdown; when in **Readiness**, a single tap begins the next **Work** cycle.
-- **Center Time Element Long Press**: Advances to the next phase in Standard Mode, or swaps between Work and Break in Flexible Mode.
-- **Swipe Up Starting from Bottom Edge**: Starting a swipe on the bottom 18% edge of the watch screen and dragging up opens the **Flexible Mode** controls to toggle Flexible Mode or swap between Work and Break.
+- **Center Time Element Single Tap**: Tapping directly on the central time readout starts, pauses, or resumes the active countdown; when in **Readiness**, a single tap begins the next **Work** cycle.
+- **Center Time Element Long Press**: Advances to the next phase in Standard Mode, or swaps between Work and Break in Flexible Mode (automatically unpausing the swapped-in timer).
+- **Vertical Swipe (Up or Down)**: Swiping up or pulling down vertically swaps between the **Standard Mode** screen and the **Flexible Mode** screen.
 - **Swipe Left Starting from Right Edge**: Starting a swipe on the rightmost 16% edge of the watch screen and dragging left opens the Configuration UI drawer.
-- **Interactive 4-Step Vector Tutorial**: Shown on first launch and re-openable from Settings at any time, using animated vector hand icons and motion arrows to teach right-edge settings swipe, clock tap, Wear OS complications, and bottom-edge Flexible Mode.
+- **Interactive 4-Step Vector Tutorial**: Shown on first launch and re-openable from Settings at any time, using animated vector hand icons and motion arrows to teach right-edge settings swipe, clock tap, Wear OS complications, and vertical swipe + long-tap swapping in Flexible Mode.
 
 ## 4. Visual and Typography Requirements
 
