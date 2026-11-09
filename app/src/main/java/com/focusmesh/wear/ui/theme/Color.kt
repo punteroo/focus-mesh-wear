@@ -3,16 +3,23 @@ package com.focusmesh.wear.ui.theme
 import androidx.compose.ui.graphics.Color
 import com.focusmesh.wear.domain.model.TimerPhase
 
-// Holds the primary highlight, secondary contour, and deep background colors for a timer phase.
+// Holds the primary highlight, secondary contour, and deep background colors for a timer state.
 data class PhasePalette(
     val primary: Color,
     val secondary: Color,
     val deepBackground: Color
 )
 
+// Paused (Orange): Always displayed when a timer is paused, shifting into the active phase color when started.
+val PausedPalette = PhasePalette(
+    primary = Color(0xFFFF6D1A),
+    secondary = Color(0xFFA83A00),
+    deepBackground = Color(0xFF280C02)
+)
+
 // Work (Red): High-energy crimson and deep ruby tones for the 60-minute focus block.
 val WorkPalette = PhasePalette(
-    primary = Color(0xFFFF3355),
+    primary = Color(0xFFFF2E55),
     secondary = Color(0xFF9E1128),
     deepBackground = Color(0xFF28050B)
 )
@@ -24,15 +31,28 @@ val BreakPalette = PhasePalette(
     deepBackground = Color(0xFF041C28)
 )
 
-// Readiness (Yellow): Warm amber and gold tones indicating readiness to manually begin the next cycle.
+// Readiness (Yellow): Warm lemon-gold tones indicating readiness to begin the next cycle.
 val ReadinessPalette = PhasePalette(
-    primary = Color(0xFFFFD426),
-    secondary = Color(0xFF9A7200),
-    deepBackground = Color(0xFF261C03)
+    primary = Color(0xFFFFDD26),
+    secondary = Color(0xFF9A7A00),
+    deepBackground = Color(0xFF261E02)
 )
 
 fun paletteForPhase(phase: TimerPhase): PhasePalette = when (phase) {
     TimerPhase.WORK -> WorkPalette
     TimerPhase.BREAK -> BreakPalette
     TimerPhase.READINESS -> ReadinessPalette
+}
+
+// Resolves the active visual palette: always Orange while paused, shifting into the phase color when running
+// or when holding in the Readiness manual-continue state.
+fun paletteForTimerState(
+    phase: TimerPhase,
+    isRunning: Boolean,
+    isAwaitingManualContinue: Boolean
+): PhasePalette {
+    if (!isRunning && !isAwaitingManualContinue) {
+        return PausedPalette
+    }
+    return paletteForPhase(phase)
 }
