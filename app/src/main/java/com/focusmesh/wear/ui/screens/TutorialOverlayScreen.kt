@@ -24,8 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
@@ -204,7 +204,11 @@ fun TutorialOverlayScreen(
                 modifier = Modifier.size(ButtonDefaults.ExtraSmallButtonSize)
             ) {
                 Icon(
-                    imageVector = if (currentStep > 0) Icons.Default.ArrowBack else Icons.Default.Close,
+                    imageVector = if (currentStep > 0) {
+                        Icons.AutoMirrored.Filled.ArrowBack
+                    } else {
+                        Icons.Default.Close
+                    },
                     contentDescription = null
                 )
             }
@@ -227,7 +231,7 @@ fun TutorialOverlayScreen(
             ) {
                 Icon(
                     imageVector = if (currentStep < totalSteps - 1) {
-                        Icons.Default.ArrowForward
+                        Icons.AutoMirrored.Filled.ArrowForward
                     } else {
                         Icons.Default.Check
                     },

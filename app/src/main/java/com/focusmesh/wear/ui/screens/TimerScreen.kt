@@ -538,18 +538,18 @@ private fun NativeFlexibleModeBottomSheet(
             }
 
             if (timerState.phase != TimerPhase.READINESS) {
-                val swapLabel = if (timerState.phase == TimerPhase.WORK) {
-                    stringResource(
-                        R.string.flexible_swap_to_break,
-                        timerState.formattedStandbyPoolTime()
-                    )
-                } else {
-                    stringResource(
-                        R.string.flexible_swap_to_work,
-                        timerState.formattedStandbyPoolTime()
-                    )
-                }
                 item {
+                    val swapLabel = if (timerState.phase == TimerPhase.WORK) {
+                        stringResource(
+                            R.string.flexible_swap_to_break,
+                            timerState.formattedStandbyPoolTime()
+                        )
+                    } else {
+                        stringResource(
+                            R.string.flexible_swap_to_work,
+                            timerState.formattedStandbyPoolTime()
+                        )
+                    }
                     Chip(
                         onClick = onSwapPhaseNow,
                         label = {
