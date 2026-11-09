@@ -17,11 +17,11 @@ val PausedPalette = PhasePalette(
     deepBackground = Color(0xFF280C02)
 )
 
-// Work (Red): High-energy crimson and deep ruby tones for the 60-minute focus block.
+// Work (Red): Clear, vibrant scarlet and bright crimson tones for the 60-minute focus block.
 val WorkPalette = PhasePalette(
-    primary = Color(0xFFFF2E55),
-    secondary = Color(0xFF9E1128),
-    deepBackground = Color(0xFF28050B)
+    primary = Color(0xFFFF4D5A),
+    secondary = Color(0xFFD92B3A),
+    deepBackground = Color(0xFF3D0C14)
 )
 
 // Break (Light Blue): Calm sky cyan and ocean blue tones for the 15-minute no-screen break.
