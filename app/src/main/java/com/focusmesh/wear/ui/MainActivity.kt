@@ -1,9 +1,14 @@
 package com.focusmesh.wear.ui
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -29,11 +34,16 @@ import com.focusmesh.wear.ui.screens.TimerScreen
 import kotlinx.coroutines.launch
 
 // Entry activity hosting the uncluttered timer canvas (Page 0) and right-side configuration drawer (Page 1).
-// Observes Wear OS Ambient Mode to halt 3D mesh animations when the watch enters Always-On Display.
+// Observes both Wear OS Ambient Mode and Android Battery Saver state so mesh rendering drops to a solid
+// background automatically when Battery Saver is active.
 class MainActivity : ComponentActivity() {
 
     private val viewModel: TimerViewModel by viewModels()
     private var isAmbientState by mutableStateOf(false)
+    private var isBatterySaverState by mutableStateOf(false)
+
+    private lateinit var powerManager: PowerManager
+    private lateinit var ambientObserver: AmbientLifecycleObserver
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -53,14 +63,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private lateinit var ambientObserver: AmbientLifecycleObserver
+    private val powerSaveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == PowerManager.ACTION_POWER_SAVE_MODE_CHANGED) {
+                isBatterySaverState = powerManager.isPowerSaveMode
+            }
+        }
+    }
 
     @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        isBatterySaverState = powerManager.isPowerSaveMode
+
         ambientObserver = AmbientLifecycleObserver(this, ambientCallbacks)
         lifecycle.addObserver(ambientObserver)
+
+        registerReceiver(
+            powerSaveReceiver,
+            IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+        )
 
         requestNotificationPermissionIfNeeded()
 
@@ -70,8 +94,6 @@ class MainActivity : ComponentActivity() {
                 val preferences by viewModel.preferences.collectAsState()
                 val coroutineScope = rememberCoroutineScope()
 
-                // Page 0 is the main TimerScreen; Page 1 (on the right side of the watch) is SettingsDrawerScreen.
-                // Swiping left (from right to left) opens Settings without conflicting with Wear OS left-edge Back.
                 val pagerState = rememberPagerState(
                     initialPage = 0,
                     pageCount = { 2 }
@@ -91,28 +113,37 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Disable full-screen pager drag on Page 0 so only a swipe starting from the right edge
+                // of TimerScreen opens Settings, allowing unrestricted mesh interaction across the screen.
                 HorizontalPager(
                     state = pagerState,
-                    userScrollEnabled = !isAmbientState,
+                    userScrollEnabled = pagerState.currentPage == 1 && !isAmbientState,
                     modifier = Modifier.fillMaxSize()
                 ) { page ->
                     if (page == 0) {
                         TimerScreen(
                             timerState = timerState,
                             preferences = preferences,
+                            isBatterySaverActive = isBatterySaverState,
                             isAmbient = isAmbientState,
                             onPrimaryTap = viewModel::onPrimaryAction,
-                            onLongPressSkip = viewModel::onSkipPhase
+                            onLongPressSkip = viewModel::onSkipPhase,
+                            onOpenSettingsFromRightEdge = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(1)
+                                }
+                            }
                         )
                     } else {
                         SettingsDrawerScreen(
                             preferences = preferences,
-                            onToggleMesh3d = viewModel::setMesh3dEnabled,
+                            isBatterySaverActive = isBatterySaverState,
+                            onCycleBackgroundMode = viewModel::cycleBackgroundMode,
                             onToggleTouchWave = viewModel::setTouchWaveEnabled,
                             onToggleReadinessGrace = viewModel::setReadinessGraceEnabled,
-                            onCycleGraceMinutes = viewModel::cycleReadinessGraceMinutes,
-                            onCycleWorkMinutes = viewModel::cycleWorkDurationMinutes,
-                            onCycleBreakMinutes = viewModel::cycleBreakDurationMinutes,
+                            onSaveWorkDurationSeconds = viewModel::setWorkDurationSeconds,
+                            onSaveBreakDurationSeconds = viewModel::setBreakDurationSeconds,
+                            onSaveGraceDurationSeconds = viewModel::setReadinessGraceSeconds,
                             onCycleFont = viewModel::cycleFontChoice,
                             onCycleAlertMode = viewModel::cycleAlertMode,
                             onCycleSoundOption = viewModel::cycleSoundOption,
@@ -127,8 +158,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        isBatterySaverState = powerManager.isPowerSaveMode
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(powerSaveReceiver) }
+        super.onDestroy()
+    }
+
     // Intercepts secondary hardware watch stem buttons only while MainActivity has foreground window focus.
-    // This never overrides the user's system-wide Galaxy Watch Ultra Quick Button binding outside the app.
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         return when (keyCode) {
             KeyEvent.KEYCODE_STEM_PRIMARY,

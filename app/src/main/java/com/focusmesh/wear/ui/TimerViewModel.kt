@@ -47,9 +47,10 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         sendServiceAction(TimerForegroundService.ACTION_RESET_PHASE)
     }
 
-    fun setMesh3dEnabled(enabled: Boolean) {
+    fun cycleBackgroundMode() {
+        val next = preferences.value.backgroundMode.next()
         viewModelScope.launch {
-            preferencesRepository.setMesh3dEnabled(enabled)
+            preferencesRepository.setBackgroundMode(next)
         }
     }
 
@@ -65,43 +66,21 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun cycleReadinessGraceMinutes() {
-        val current = preferences.value.readinessGraceMinutes
-        val next = when (current) {
-            2 -> 5
-            5 -> 10
-            10 -> 15
-            else -> 2
-        }
+    fun setWorkDurationSeconds(totalSeconds: Int) {
         viewModelScope.launch {
-            preferencesRepository.setReadinessGraceMinutes(next)
+            preferencesRepository.setWorkDurationSeconds(totalSeconds.coerceAtLeast(1))
         }
     }
 
-    fun cycleWorkDurationMinutes() {
-        val current = preferences.value.workDurationMinutes
-        val next = when (current) {
-            45 -> 60
-            60 -> 75
-            75 -> 90
-            90 -> 30
-            else -> 60
-        }
+    fun setBreakDurationSeconds(totalSeconds: Int) {
         viewModelScope.launch {
-            preferencesRepository.setWorkDurationMinutes(next)
+            preferencesRepository.setBreakDurationSeconds(totalSeconds.coerceAtLeast(1))
         }
     }
 
-    fun cycleBreakDurationMinutes() {
-        val current = preferences.value.breakDurationMinutes
-        val next = when (current) {
-            10 -> 15
-            15 -> 20
-            20 -> 5
-            else -> 15
-        }
+    fun setReadinessGraceSeconds(totalSeconds: Int) {
         viewModelScope.launch {
-            preferencesRepository.setBreakDurationMinutes(next)
+            preferencesRepository.setReadinessGraceSeconds(totalSeconds.coerceAtLeast(1))
         }
     }
 
