@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.ongoing.OngoingActivity
@@ -29,8 +30,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 // Foreground service maintaining the continuous Work -> Break -> Readiness cycle.
-// Publishes a Wear OS OngoingActivity with both TimerPart and Chronometer metadata so One UI Watch
-// renders the live countdown time inside the home screen pill.
+// Renders the live MM:SS countdown directly into the OngoingActivity Icon and Status so the watch face
+// indicator displays the current time rather than a static alarm icon.
 class TimerForegroundService : LifecycleService() {
 
     private lateinit var preferencesRepository: PreferencesRepository
@@ -289,8 +290,8 @@ class TimerForegroundService : LifecycleService() {
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-    // Builds the notification and attaches a Wear OS OngoingActivity with TimerPart and Chronometer metadata
-    // so One UI Watch displays the live MM:SS countdown inside the watch face pill.
+    // Builds the ongoing notification using a dynamically rendered MM:SS bitmap Icon so the watch face
+    // OngoingActivity indicator displays the live countdown time instead of a static alarm icon.
     private fun buildOngoingNotification(): Notification {
         val state = _timerState.value
         val launchIntent = Intent(this, MainActivity::class.java).apply {
@@ -304,6 +305,7 @@ class TimerForegroundService : LifecycleService() {
         )
 
         val formattedTime = state.formattedTime()
+        val readinessShortLabel = getString(R.string.phase_readiness)
         val statusText = when (state.phase) {
             TimerPhase.WORK -> getString(R.string.ongoing_work_status, formattedTime)
             TimerPhase.BREAK -> getString(R.string.ongoing_break_status, formattedTime)
@@ -314,12 +316,18 @@ class TimerForegroundService : LifecycleService() {
             }
         }
 
+        val dynamicTimerIcon = OngoingPillIconRenderer.createTimerIcon(
+            state = state,
+            readinessLabel = readinessShortLabel
+        )
+        val compatTimerIcon = IconCompat.createFromIcon(this, dynamicTimerIcon)
+
         val nowElapsed = SystemClock.elapsedRealtime()
         val nowWall = System.currentTimeMillis()
         val hasCountdown = state.remainingMillis > 0L
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(compatTimerIcon)
             .setContentTitle(formattedTime)
             .setContentText(statusText)
             .setSubText(formattedTime)
@@ -327,7 +335,7 @@ class TimerForegroundService : LifecycleService() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
@@ -343,7 +351,6 @@ class TimerForegroundService : LifecycleService() {
                 .setUsesChronometer(false)
         }
 
-        // Use a direct single-part TimerPart when counting down so One UI Watch renders the MM:SS timer in the pill.
         val ongoingStatus = when {
             state.isRunning && hasCountdown -> {
                 Status.forPart(Status.TimerPart(nowElapsed + state.remainingMillis))
@@ -357,13 +364,13 @@ class TimerForegroundService : LifecycleService() {
                 )
             }
             else -> {
-                Status.forPart(Status.TextPart(getString(R.string.phase_readiness)))
+                Status.forPart(Status.TextPart(readinessShortLabel))
             }
         }
 
         val ongoingActivity = OngoingActivity.Builder(applicationContext, NOTIFICATION_ID, builder)
-            .setAnimatedIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setStaticIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setStaticIcon(dynamicTimerIcon)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setTitle(formattedTime)
             .setTouchIntent(contentPendingIntent)
             .setStatus(ongoingStatus)
