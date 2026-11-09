@@ -65,6 +65,17 @@ data class TimerState(
         return (remainingMillis.toFloat() / totalPhaseMillis.toFloat()).coerceIn(0.0f, 1.0f)
     }
 
+    // Computes normalized progress of the preserved standby pool in Flexible mode.
+    fun standbyProgressFraction(): Float {
+        return if (phase == TimerPhase.WORK) {
+            if (savedBreakTotalMillis <= 0L) 1.0f
+            else (savedBreakRemainingMillis.toFloat() / savedBreakTotalMillis.toFloat()).coerceIn(0.0f, 1.0f)
+        } else {
+            if (savedWorkTotalMillis <= 0L) 1.0f
+            else (savedWorkRemainingMillis.toFloat() / savedWorkTotalMillis.toFloat()).coerceIn(0.0f, 1.0f)
+        }
+    }
+
     companion object {
         fun formatMillis(millis: Long): String {
             val totalSeconds = (millis.coerceAtLeast(0L) + 999L) / 1000L
