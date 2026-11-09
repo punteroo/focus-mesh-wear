@@ -20,15 +20,10 @@
     <string name="ongoing_readiness_status">Listo para continuar</string>
     <string name="complication_provider_label">Temporizador FocusMesh</string>
 
-    <!-- Routine modes and Flexible Mode bottom drawer strings. -->
-    <string name="settings_routine_mode">Modo de Temporizador</string>
+    <!-- Routine modes and Flexible Mode screen indicator strings. -->
     <string name="mode_standard">Modo Estandar</string>
-    <string name="mode_standard_desc">Ciclo secuencial Enfoque a Descanso</string>
     <string name="mode_flexible">Modo Flexible</string>
-    <string name="mode_flexible_desc">Alterna Enfoque y Descanso libremente</string>
-    <string name="flexible_sheet_title">Controles Flexibles</string>
-    <string name="flexible_swap_to_break">Cambiar a Descanso (%1$s)</string>
-    <string name="flexible_swap_to_work">Cambiar a Enfoque (%1$s)</string>
+    <string name="flexible_mode_indicator">FLEXIBLE</string>
     <string name="flexible_badge_break">DESC %1$s</string>
     <string name="flexible_badge_work">ENF %1$s</string>
 
@@ -97,6 +92,6 @@
     <string name="tutorial_step_3_title">3. Complicaciones Wear OS</string>
     <string name="tutorial_step_3_body">Agrega la complicacion oficial de FocusMesh a tu esfera para ver el conteo en vivo.</string>
     <string name="tutorial_step_4_title">4. Modo Flexible</string>
-    <string name="tutorial_step_4_body">Desliza hacia arriba desde el borde inferior para usar el Modo Flexible y alternar libremente.</string>
+    <string name="tutorial_step_4_body">Desliza arriba o abajo para alternar entre Modo Estandar y Flexible. Manten pulsado el reloj para cambiar de fase.</string>
     <string name="tutorial_done">Comenzar a Usar</string>
 </resources>

@@ -20,15 +20,10 @@
     <string name="ongoing_readiness_status">Ready to continue</string>
     <string name="complication_provider_label">FocusMesh Timer</string>
 
-    <!-- Routine modes and Flexible Mode bottom drawer strings. -->
-    <string name="settings_routine_mode">Timer Mode</string>
+    <!-- Routine modes and Flexible Mode screen indicator strings. -->
     <string name="mode_standard">Standard Mode</string>
-    <string name="mode_standard_desc">Sequential Work to Break cycle</string>
     <string name="mode_flexible">Flexible Mode</string>
-    <string name="mode_flexible_desc">Swap Work &amp; Break anytime</string>
-    <string name="flexible_sheet_title">Flexible Controls</string>
-    <string name="flexible_swap_to_break">Swap to Break (%1$s)</string>
-    <string name="flexible_swap_to_work">Swap to Work (%1$s)</string>
+    <string name="flexible_mode_indicator">FLEXIBLE</string>
     <string name="flexible_badge_break">BRK %1$s</string>
     <string name="flexible_badge_work">WRK %1$s</string>
 
@@ -97,6 +92,6 @@
     <string name="tutorial_step_3_title">3. Watch Complications</string>
     <string name="tutorial_step_3_body">Add the official FocusMesh Wear OS complication to your watch face for live countdowns.</string>
     <string name="tutorial_step_4_title">4. Flexible Mode</string>
-    <string name="tutorial_step_4_body">Swipe up from the bottom edge to use Flexible mode and swap between Work and Break freely.</string>
+    <string name="tutorial_step_4_body">Swipe up or down to switch between Standard and Flexible screens. Long-tap the clock to swap Work and Break.</string>
     <string name="tutorial_done">Start Using FocusMesh</string>
 </resources>
