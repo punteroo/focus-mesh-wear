@@ -18,6 +18,7 @@ import androidx.wear.ongoing.Status
 import com.focusmesh.wear.R
 import com.focusmesh.wear.alerts.AlertController
 import com.focusmesh.wear.data.PreferencesRepository
+import com.focusmesh.wear.domain.model.RoutineMode
 import com.focusmesh.wear.domain.model.TimerPhase
 import com.focusmesh.wear.domain.model.TimerState
 import com.focusmesh.wear.domain.model.UserPreferences
@@ -30,9 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-// Foreground service maintaining the continuous Work -> Break -> Readiness cycle.
-// Renders the live countdown directly into the OngoingActivity Icon and Status so the watch face
-// indicator displays the current time rather than a static alarm icon.
+// Foreground service maintaining both Standard sequential cycles and Flexible dual-pool Work/Break swapping.
 class TimerForegroundService : LifecycleService() {
 
     private lateinit var preferencesRepository: PreferencesRepository
@@ -41,6 +40,7 @@ class TimerForegroundService : LifecycleService() {
     private lateinit var notificationManager: NotificationManager
 
     private var latestPreferences = UserPreferences()
+    private var hasLoadedInitialPreferences = false
     private var tickerJob: Job? = null
     private var lastNotificationSecond: Long = -1L
 
@@ -56,20 +56,47 @@ class TimerForegroundService : LifecycleService() {
         lifecycleScope.launch {
             preferencesRepository.preferencesFlow.collectLatest { prefs ->
                 val oldPrefs = latestPreferences
+                val oldPreset = oldPrefs.activePresetForMode(oldPrefs.routineMode)
+                val newPreset = prefs.activePresetForMode(prefs.routineMode)
                 latestPreferences = prefs
-                val current = _timerState.value
-                // When paused at the full duration of a phase, immediately reflect newly saved duration changes.
-                if (!current.isRunning && current.remainingMillis == current.totalPhaseMillis) {
-                    val updatedTotal = phaseDurationMillis(current.phase, prefs)
-                    _timerState.value = current.copy(
-                        remainingMillis = updatedTotal,
-                        totalPhaseMillis = updatedTotal,
-                        isAwaitingManualContinue = current.phase == TimerPhase.READINESS && !prefs.readinessGraceEnabled
-                    )
-                    FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
-                } else if (current.phase == TimerPhase.READINESS && oldPrefs.readinessGraceEnabled != prefs.readinessGraceEnabled) {
-                    enterPhase(TimerPhase.READINESS, autoStart = prefs.readinessGraceEnabled, triggerAlerts = false)
+
+                if (!hasLoadedInitialPreferences) {
+                    hasLoadedInitialPreferences = true
+                    if (!_timerState.value.isRunning) {
+                        resetToActivePreset(prefs)
+                    }
+                    return@collectLatest
                 }
+
+                val modeChanged = oldPrefs.routineMode != prefs.routineMode
+                val presetIdChanged = oldPreset.id != newPreset.id
+                val presetDurationsChanged =
+                    oldPreset.workDurationSeconds != newPreset.workDurationSeconds ||
+                        oldPreset.breakDurationSeconds != newPreset.breakDurationSeconds
+
+                // Swapping modes or selecting a different preset immediately resets timers.
+                if (modeChanged || presetIdChanged || presetDurationsChanged) {
+                    resetToActivePreset(prefs)
+                    return@collectLatest
+                }
+
+                // Update preset display name live if only the name was edited.
+                if (oldPreset.name != newPreset.name) {
+                    _timerState.value = _timerState.value.copy(activePresetName = newPreset.name)
+                    FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
+                }
+
+                val current = _timerState.value
+                if (current.phase == TimerPhase.READINESS &&
+                    oldPrefs.readinessGraceEnabled != prefs.readinessGraceEnabled
+                ) {
+                    enterPhase(
+                        phase = TimerPhase.READINESS,
+                        autoStart = prefs.readinessGraceEnabled,
+                        triggerAlerts = false
+                    )
+                }
+
                 if (oldPrefs.ongoingPillEnabled != prefs.ongoingPillEnabled && current.isRunning) {
                     notificationManager.cancel(NOTIFICATION_ID)
                     startForegroundWithOngoingActivity()
@@ -82,8 +109,9 @@ class TimerForegroundService : LifecycleService() {
         super.onStartCommand(intent, flags, startId)
         when (intent?.action) {
             ACTION_TOGGLE_OR_CONTINUE -> handlePrimaryAction()
-            ACTION_SKIP_PHASE -> advanceToNextPhase(triggerAlerts = true)
-            ACTION_RESET_PHASE -> resetCurrentPhase()
+            ACTION_SKIP_PHASE -> handleSkipOrSwapPhase()
+            ACTION_SWAP_FLEXIBLE_PHASE -> swapFlexibleWorkAndBreak(triggerAlerts = false)
+            ACTION_RESET_PHASE -> resetToActivePreset(latestPreferences)
             ACTION_ALARM_EXPIRED -> onExactAlarmExpired()
             ACTION_AMBIENT_UPDATE -> onAmbientTickUpdate()
         }
@@ -94,7 +122,7 @@ class TimerForegroundService : LifecycleService() {
     private fun handlePrimaryAction() {
         val current = _timerState.value
         if (current.phase == TimerPhase.READINESS) {
-            enterPhase(TimerPhase.WORK, autoStart = true, triggerAlerts = true)
+            replenishPoolsAndStartWork(triggerAlerts = true)
             return
         }
         if (current.isRunning) {
@@ -102,6 +130,92 @@ class TimerForegroundService : LifecycleService() {
         } else {
             startOrResumeTimer()
         }
+    }
+
+    private fun handleSkipOrSwapPhase() {
+        if (latestPreferences.routineMode == RoutineMode.FLEXIBLE &&
+            _timerState.value.phase != TimerPhase.READINESS
+        ) {
+            swapFlexibleWorkAndBreak(triggerAlerts = false)
+        } else {
+            advanceToNextPhase(triggerAlerts = true)
+        }
+    }
+
+    // In Flexible Mode, swaps between WORK and BREAK while pausing and preserving each timer's remaining pool.
+    private fun swapFlexibleWorkAndBreak(triggerAlerts: Boolean) {
+        val current = _timerState.value
+        if (current.phase == TimerPhase.READINESS) {
+            replenishPoolsAndStartWork(triggerAlerts = triggerAlerts)
+            return
+        }
+
+        val liveRemaining = if (current.isRunning) {
+            (targetCompletionElapsedMillis - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        } else {
+            current.remainingMillis
+        }
+
+        tickerJob?.cancel()
+        cancelExactWakeup()
+
+        if (triggerAlerts) {
+            alertController.triggerPhaseAlert(
+                phase = if (current.phase == TimerPhase.WORK) TimerPhase.BREAK else TimerPhase.WORK,
+                preferences = latestPreferences
+            )
+        }
+
+        val preset = latestPreferences.activePresetForMode(RoutineMode.FLEXIBLE)
+        val fullWorkMillis = preset.workDurationSeconds.coerceAtLeast(1) * 1000L
+        val fullBreakMillis = preset.breakDurationSeconds.coerceAtLeast(1) * 1000L
+
+        if (current.phase == TimerPhase.WORK) {
+            val savedWork = if (liveRemaining > 0L) liveRemaining else fullWorkMillis
+            val nextBreakRemaining = if (current.savedBreakRemainingMillis > 0L) {
+                current.savedBreakRemainingMillis
+            } else {
+                fullBreakMillis
+            }
+            _timerState.value = current.copy(
+                routineMode = RoutineMode.FLEXIBLE,
+                activePresetId = preset.id,
+                activePresetName = preset.name,
+                phase = TimerPhase.BREAK,
+                isRunning = false,
+                remainingMillis = nextBreakRemaining,
+                totalPhaseMillis = current.savedBreakTotalMillis.coerceAtLeast(fullBreakMillis),
+                savedWorkRemainingMillis = savedWork,
+                savedWorkTotalMillis = fullWorkMillis,
+                savedBreakRemainingMillis = nextBreakRemaining,
+                savedBreakTotalMillis = fullBreakMillis,
+                isAwaitingManualContinue = false
+            )
+        } else {
+            val savedBreak = if (liveRemaining > 0L) liveRemaining else fullBreakMillis
+            val nextWorkRemaining = if (current.savedWorkRemainingMillis > 0L) {
+                current.savedWorkRemainingMillis
+            } else {
+                fullWorkMillis
+            }
+            _timerState.value = current.copy(
+                routineMode = RoutineMode.FLEXIBLE,
+                activePresetId = preset.id,
+                activePresetName = preset.name,
+                phase = TimerPhase.WORK,
+                isRunning = false,
+                remainingMillis = nextWorkRemaining,
+                totalPhaseMillis = current.savedWorkTotalMillis.coerceAtLeast(fullWorkMillis),
+                savedWorkRemainingMillis = nextWorkRemaining,
+                savedWorkTotalMillis = fullWorkMillis,
+                savedBreakRemainingMillis = savedBreak,
+                savedBreakTotalMillis = fullBreakMillis,
+                isAwaitingManualContinue = false
+            )
+        }
+
+        updateOngoingNotification()
+        FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
     }
 
     private fun startOrResumeTimer() {
@@ -115,6 +229,8 @@ class TimerForegroundService : LifecycleService() {
         _timerState.value = current.copy(
             isRunning = true,
             remainingMillis = remaining,
+            savedWorkRemainingMillis = if (current.phase == TimerPhase.WORK) remaining else current.savedWorkRemainingMillis,
+            savedBreakRemainingMillis = if (current.phase == TimerPhase.BREAK) remaining else current.savedBreakRemainingMillis,
             isAwaitingManualContinue = false
         )
         scheduleExactWakeup(targetCompletionElapsedMillis)
@@ -126,29 +242,57 @@ class TimerForegroundService : LifecycleService() {
     private fun pauseTimer() {
         tickerJob?.cancel()
         cancelExactWakeup()
+        val current = _timerState.value
         val remaining = (targetCompletionElapsedMillis - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
-        _timerState.value = _timerState.value.copy(
+        _timerState.value = current.copy(
             isRunning = false,
-            remainingMillis = remaining
+            remainingMillis = remaining,
+            savedWorkRemainingMillis = if (current.phase == TimerPhase.WORK) remaining else current.savedWorkRemainingMillis,
+            savedBreakRemainingMillis = if (current.phase == TimerPhase.BREAK) remaining else current.savedBreakRemainingMillis
         )
         updateOngoingNotification()
         FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
     }
 
-    private fun resetCurrentPhase() {
+    // Resets both Work and Break pools to the active preset's full configured durations in the PAUSED state.
+    private fun resetToActivePreset(prefs: UserPreferences) {
         tickerJob?.cancel()
         cancelExactWakeup()
-        val phase = _timerState.value.phase
-        val duration = phaseDurationMillis(phase, latestPreferences)
+        val preset = prefs.activePresetForMode(prefs.routineMode)
+        val workMillis = preset.workDurationSeconds.coerceAtLeast(1) * 1000L
+        val breakMillis = preset.breakDurationSeconds.coerceAtLeast(1) * 1000L
         _timerState.value = TimerState(
-            phase = phase,
+            routineMode = prefs.routineMode,
+            activePresetId = preset.id,
+            activePresetName = preset.name,
+            phase = TimerPhase.WORK,
             isRunning = false,
-            remainingMillis = duration,
-            totalPhaseMillis = duration,
-            isAwaitingManualContinue = phase == TimerPhase.READINESS && !latestPreferences.readinessGraceEnabled
+            remainingMillis = workMillis,
+            totalPhaseMillis = workMillis,
+            savedWorkRemainingMillis = workMillis,
+            savedWorkTotalMillis = workMillis,
+            savedBreakRemainingMillis = breakMillis,
+            savedBreakTotalMillis = breakMillis,
+            isAwaitingManualContinue = false
         )
         updateOngoingNotification()
         FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
+    }
+
+    private fun replenishPoolsAndStartWork(triggerAlerts: Boolean) {
+        val preset = latestPreferences.activePresetForMode(latestPreferences.routineMode)
+        val workMillis = preset.workDurationSeconds.coerceAtLeast(1) * 1000L
+        val breakMillis = preset.breakDurationSeconds.coerceAtLeast(1) * 1000L
+        _timerState.value = _timerState.value.copy(
+            routineMode = latestPreferences.routineMode,
+            activePresetId = preset.id,
+            activePresetName = preset.name,
+            savedWorkRemainingMillis = workMillis,
+            savedWorkTotalMillis = workMillis,
+            savedBreakRemainingMillis = breakMillis,
+            savedBreakTotalMillis = breakMillis
+        )
+        enterPhase(TimerPhase.WORK, autoStart = true, triggerAlerts = triggerAlerts)
     }
 
     private fun onExactAlarmExpired() {
@@ -163,6 +307,35 @@ class TimerForegroundService : LifecycleService() {
             )
             updateOngoingNotification()
             FocusTimerComplicationService.requestComplicationUpdate(applicationContext)
+            return
+        }
+
+        if (latestPreferences.routineMode == RoutineMode.FLEXIBLE) {
+            if (current.phase == TimerPhase.WORK) {
+                _timerState.value = current.copy(remainingMillis = 0L, savedWorkRemainingMillis = 0L)
+                if (current.savedBreakRemainingMillis > 0L) {
+                    swapFlexibleWorkAndBreak(triggerAlerts = true)
+                } else {
+                    enterPhase(
+                        phase = TimerPhase.READINESS,
+                        autoStart = latestPreferences.readinessGraceEnabled,
+                        triggerAlerts = true
+                    )
+                }
+            } else if (current.phase == TimerPhase.BREAK) {
+                _timerState.value = current.copy(remainingMillis = 0L, savedBreakRemainingMillis = 0L)
+                if (current.savedWorkRemainingMillis > 0L) {
+                    swapFlexibleWorkAndBreak(triggerAlerts = true)
+                } else {
+                    enterPhase(
+                        phase = TimerPhase.READINESS,
+                        autoStart = latestPreferences.readinessGraceEnabled,
+                        triggerAlerts = true
+                    )
+                }
+            } else {
+                replenishPoolsAndStartWork(triggerAlerts = true)
+            }
         } else {
             advanceToNextPhase(triggerAlerts = true)
         }
@@ -187,16 +360,26 @@ class TimerForegroundService : LifecycleService() {
             alertController.triggerPhaseAlert(phase, latestPreferences)
         }
 
+        val preset = latestPreferences.activePresetForMode(latestPreferences.routineMode)
+        val workMillis = preset.workDurationSeconds.coerceAtLeast(1) * 1000L
+        val breakMillis = preset.breakDurationSeconds.coerceAtLeast(1) * 1000L
         val duration = phaseDurationMillis(phase, latestPreferences)
         val awaitingManual = phase == TimerPhase.READINESS && !latestPreferences.readinessGraceEnabled
 
         if (autoStart && duration > 0L) {
             targetCompletionElapsedMillis = SystemClock.elapsedRealtime() + duration
             _timerState.value = TimerState(
+                routineMode = latestPreferences.routineMode,
+                activePresetId = preset.id,
+                activePresetName = preset.name,
                 phase = phase,
                 isRunning = true,
                 remainingMillis = duration,
                 totalPhaseMillis = duration,
+                savedWorkRemainingMillis = workMillis,
+                savedWorkTotalMillis = workMillis,
+                savedBreakRemainingMillis = breakMillis,
+                savedBreakTotalMillis = breakMillis,
                 isAwaitingManualContinue = false
             )
             scheduleExactWakeup(targetCompletionElapsedMillis)
@@ -205,10 +388,17 @@ class TimerForegroundService : LifecycleService() {
             startUiTicker()
         } else {
             _timerState.value = TimerState(
+                routineMode = latestPreferences.routineMode,
+                activePresetId = preset.id,
+                activePresetName = preset.name,
                 phase = phase,
                 isRunning = false,
                 remainingMillis = duration,
                 totalPhaseMillis = duration,
+                savedWorkRemainingMillis = if (phase == TimerPhase.WORK) duration else _timerState.value.savedWorkRemainingMillis,
+                savedWorkTotalMillis = workMillis,
+                savedBreakRemainingMillis = if (phase == TimerPhase.BREAK) duration else _timerState.value.savedBreakRemainingMillis,
+                savedBreakTotalMillis = breakMillis,
                 isAwaitingManualContinue = awaitingManual
             )
             startForegroundWithOngoingActivity()
@@ -223,7 +413,12 @@ class TimerForegroundService : LifecycleService() {
             while (_timerState.value.isRunning) {
                 val now = SystemClock.elapsedRealtime()
                 val remaining = (targetCompletionElapsedMillis - now).coerceAtLeast(0L)
-                _timerState.value = _timerState.value.copy(remainingMillis = remaining)
+                val current = _timerState.value
+                _timerState.value = current.copy(
+                    remainingMillis = remaining,
+                    savedWorkRemainingMillis = if (current.phase == TimerPhase.WORK) remaining else current.savedWorkRemainingMillis,
+                    savedBreakRemainingMillis = if (current.phase == TimerPhase.BREAK) remaining else current.savedBreakRemainingMillis
+                )
                 val currentSecond = (remaining + 999L) / 1000L
                 if (currentSecond != lastNotificationSecond) {
                     lastNotificationSecond = currentSecond
@@ -252,13 +447,16 @@ class TimerForegroundService : LifecycleService() {
         }
     }
 
-    private fun phaseDurationMillis(phase: TimerPhase, prefs: UserPreferences): Long = when (phase) {
-        TimerPhase.WORK -> prefs.workDurationSeconds.coerceAtLeast(1) * 1000L
-        TimerPhase.BREAK -> prefs.breakDurationSeconds.coerceAtLeast(1) * 1000L
-        TimerPhase.READINESS -> if (prefs.readinessGraceEnabled) {
-            prefs.readinessGraceSeconds.coerceAtLeast(1) * 1000L
-        } else {
-            0L
+    private fun phaseDurationMillis(phase: TimerPhase, prefs: UserPreferences): Long {
+        val preset = prefs.activePresetForMode(prefs.routineMode)
+        return when (phase) {
+            TimerPhase.WORK -> preset.workDurationSeconds.coerceAtLeast(1) * 1000L
+            TimerPhase.BREAK -> preset.breakDurationSeconds.coerceAtLeast(1) * 1000L
+            TimerPhase.READINESS -> if (prefs.readinessGraceEnabled) {
+                prefs.readinessGraceSeconds.coerceAtLeast(1) * 1000L
+            } else {
+                0L
+            }
         }
     }
 
@@ -335,7 +533,7 @@ class TimerForegroundService : LifecycleService() {
         val formattedTime = state.formattedTime()
         val readinessShortLabel = getString(R.string.phase_readiness)
         val statusText = when (state.phase) {
-            TimerPhase.WORK -> getString(R.string.ongoing_work_status, formattedTime)
+            TimerPhase.WORK -> "${state.activePresetName}: $formattedTime"
             TimerPhase.BREAK -> getString(R.string.ongoing_break_status, formattedTime)
             TimerPhase.READINESS -> if (state.totalPhaseMillis > 0L) {
                 formattedTime
@@ -414,6 +612,7 @@ class TimerForegroundService : LifecycleService() {
     companion object {
         const val ACTION_TOGGLE_OR_CONTINUE = "com.focusmesh.wear.action.TOGGLE_OR_CONTINUE"
         const val ACTION_SKIP_PHASE = "com.focusmesh.wear.action.SKIP_PHASE"
+        const val ACTION_SWAP_FLEXIBLE_PHASE = "com.focusmesh.wear.action.SWAP_FLEXIBLE_PHASE"
         const val ACTION_RESET_PHASE = "com.focusmesh.wear.action.RESET_PHASE"
         const val ACTION_ALARM_EXPIRED = "com.focusmesh.wear.action.ALARM_EXPIRED"
         const val ACTION_AMBIENT_UPDATE = "com.focusmesh.wear.action.AMBIENT_UPDATE"
@@ -435,7 +634,11 @@ class TimerForegroundService : LifecycleService() {
             val current = _timerState.value
             if (!current.isRunning) return current.remainingMillis
             val remaining = (targetCompletionElapsedMillis - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
-            _timerState.value = current.copy(remainingMillis = remaining)
+            _timerState.value = current.copy(
+                remainingMillis = remaining,
+                savedWorkRemainingMillis = if (current.phase == TimerPhase.WORK) remaining else current.savedWorkRemainingMillis,
+                savedBreakRemainingMillis = if (current.phase == TimerPhase.BREAK) remaining else current.savedBreakRemainingMillis
+            )
             return remaining
         }
     }

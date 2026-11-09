@@ -59,7 +59,7 @@ class FocusTimerComplicationService : SuspendingComplicationDataSourceService() 
         tapIntent: PendingIntent?
     ): ComplicationData? {
         val phaseLabel = when (state.phase) {
-            TimerPhase.WORK -> getString(R.string.phase_work)
+            TimerPhase.WORK -> state.activePresetName.uppercase()
             TimerPhase.BREAK -> getString(R.string.phase_break)
             TimerPhase.READINESS -> getString(R.string.phase_readiness)
         }
