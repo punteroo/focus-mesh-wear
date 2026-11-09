@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spanish localization strings for the timer display, ongoing activity status, and configuration drawer. -->
+<resources>
+    <string name="app_name">FocusMesh</string>
+
+    <!-- Minimal phase labels kept deliberately short to avoid screen clutter. -->
+    <string name="phase_work">ENFOQUE</string>
+    <string name="phase_break">DESCANSO</string>
+    <string name="phase_readiness">LISTO</string>
+
+    <!-- Minimal action hints for Readiness state and paused state. -->
+    <string name="hint_tap_to_start">TOCA PARA INICIAR</string>
+    <string name="hint_paused">PAUSADO</string>
+
+    <!-- Ongoing Activity and notification strings for One UI Watch island integration. -->
+    <string name="notification_channel_name">Alertas de Temporizador FocusMesh</string>
+    <string name="notification_channel_desc">Alertas de enfoque, descanso y preparacion que ignoran No Molestar.</string>
+    <string name="ongoing_work_status">Enfoque: %1$s</string>
+    <string name="ongoing_break_status">Descanso sin pantallas: %1$s</string>
+    <string name="ongoing_readiness_status">Listo para continuar</string>
+
+    <!-- Configuration drawer section titles and controls (opened by swiping from the left). -->
+    <string name="settings_title">Configuracion</string>
+    <string name="settings_mesh_3d">Malla 3D Animada</string>
+    <string name="settings_mesh_2d_sub">Malla 2D sutil al desactivar</string>
+    <string name="settings_touch_wave">Onda Tactil en Malla</string>
+    <string name="settings_readiness_grace">Tiempo de Gracia</string>
+    <string name="settings_grace_minutes">Gracia: %1$d min</string>
+    <string name="settings_work_minutes">Enfoque: %1$d min</string>
+    <string name="settings_break_minutes">Descanso: %1$d min</string>
+    <string name="settings_font_label">Tipografia</string>
+    <string name="settings_alert_mode">Modo de Alerta</string>
+    <string name="settings_sound_option">Sonido de Alerta</string>
+    <string name="settings_volume">Volumen: %1$d%%</string>
+    <string name="settings_test_alert">Probar Sonido y Vibracion</string>
+    <string name="settings_skip_phase">Saltar Fase Actual</string>
+    <string name="settings_reset_timer">Reiniciar Fase</string>
+
+    <!-- Alert output mode labels. -->
+    <string name="alert_mode_all">Sonido + Vibracion</string>
+    <string name="alert_mode_sound">Solo Sonido</string>
+    <string name="alert_mode_haptics">Solo Vibracion</string>
+    <string name="alert_mode_none">Silencio (Solo Visual)</string>
+
+    <!-- Curated non-robotic sound preset labels. -->
+    <string name="sound_singing_bowl">Cuenco Tibetano</string>
+    <string name="sound_warm_marimba">Marimba de Palo de Rosa</string>
+    <string name="sound_crystal_chime">Campana de Cristal</string>
+    <string name="sound_soft_gong">Gong Zen Suave</string>
+    <string name="sound_system_alarm">Alarma del Reloj</string>
+</resources>

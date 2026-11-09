@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Primary English localization strings for the timer display, ongoing activity status, and configuration drawer. -->
+<resources>
+    <string name="app_name">FocusMesh</string>
+
+    <!-- Minimal phase labels kept deliberately short to avoid screen clutter. -->
+    <string name="phase_work">WORK</string>
+    <string name="phase_break">BREAK</string>
+    <string name="phase_readiness">READY</string>
+
+    <!-- Minimal action hints for Readiness state and paused state. -->
+    <string name="hint_tap_to_start">TAP TO START</string>
+    <string name="hint_paused">PAUSED</string>
+
+    <!-- Ongoing Activity and notification strings for One UI Watch island integration. -->
+    <string name="notification_channel_name">FocusMesh Timer Alerts</string>
+    <string name="notification_channel_desc">Alerts for work, break, and readiness transitions that bypass Do Not Disturb.</string>
+    <string name="ongoing_work_status">Focus: %1$s</string>
+    <string name="ongoing_break_status">No-Screen Break: %1$s</string>
+    <string name="ongoing_readiness_status">Ready to continue</string>
+
+    <!-- Configuration drawer section titles and controls (opened by swiping from the left). -->
+    <string name="settings_title">Configuration</string>
+    <string name="settings_mesh_3d">3D Animated Mesh</string>
+    <string name="settings_mesh_2d_sub">2D subtle mesh when off</string>
+    <string name="settings_touch_wave">Touch Wave Ripple</string>
+    <string name="settings_readiness_grace">Readiness Grace Timer</string>
+    <string name="settings_grace_minutes">Grace Duration: %1$d min</string>
+    <string name="settings_work_minutes">Work Duration: %1$d min</string>
+    <string name="settings_break_minutes">Break Duration: %1$d min</string>
+    <string name="settings_font_label">Font Family</string>
+    <string name="settings_alert_mode">Alert Output</string>
+    <string name="settings_sound_option">Alert Sound</string>
+    <string name="settings_volume">Alert Volume: %1$d%%</string>
+    <string name="settings_test_alert">Preview Sound &amp; Haptics</string>
+    <string name="settings_skip_phase">Skip Current Phase</string>
+    <string name="settings_reset_timer">Reset Phase Timer</string>
+
+    <!-- Alert output mode labels. -->
+    <string name="alert_mode_all">Sound + Haptics</string>
+    <string name="alert_mode_sound">Sound Only</string>
+    <string name="alert_mode_haptics">Haptics Only</string>
+    <string name="alert_mode_none">Silent (Visual Only)</string>
+
+    <!-- Curated non-robotic sound preset labels. -->
+    <string name="sound_singing_bowl">Tibetan Singing Bowl</string>
+    <string name="sound_warm_marimba">Warm Rosewood Marimba</string>
+    <string name="sound_crystal_chime">Crystal Wind Chime</string>
+    <string name="sound_soft_gong">Soft Zen Gong</string>
+    <string name="sound_system_alarm">Watch System Alarm</string>
+</resources>
