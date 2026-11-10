@@ -35,13 +35,21 @@ Extended screen exposure can trigger digitally induced dizziness and visual vert
 - **Native Watch Face Complication & Configurable "Now" Pill**:
   - Includes a native Wear OS complication provider (`FocusTimerComplicationService`) supporting circular gauge (`RANGED_VALUE`), compact (`SHORT_TEXT`), and banner (`LONG_TEXT`) watch face slots with live-ticking `CountDownTimeReference` support.
   - Also supports the bottom One UI Watch `OngoingActivity` pill with a high-contrast dark circular backdrop and stacked digits, which can be toggled on or off in Settings (**Watch Face Pill**) so you can use a watch face complication, the bottom pill, or both.
-- **Native Wear OS Configuration Drawer & Live Font Preview**:
+- **Native Wear OS Configuration Drawer, Live Font Preview & About Screen**:
   - Swiping left starting specifically from the **right edge** of the watch (rightmost 16% bezel zone) opens the configuration drawer, leaving the rest of the screen completely free for 360-degree mesh interaction.
-  - Built with native Wear OS Compose components (`ScalingLazyColumn` with rotary bezel scroll, `ListHeader`, `ToggleChip` with `Switch` and `RadioButton` selection screens, `InlineSlider`, and 3-column `Picker` with native circular `Button` controls), including live per-font typography previews.
+  - Built with native Wear OS Compose components (`ScalingLazyColumn` with rotary bezel scroll, `ListHeader`, `ToggleChip` with `Switch` and `RadioButton` selection screens, `InlineSlider`, `TitleCard`, and 3-column `Picker` with native circular `Button` controls), including live per-font typography previews and an **About** screen with developer credits, social links, and open-source repository details.
 - **In-App Hardware Button Action**:
   - While the app is open and focused, pressing a secondary hardware watch stem button advances or toggles the timer without overriding your system-wide Galaxy Watch Ultra Quick Button binding outside the app.
 - **Bilingual Support**:
   - Full localization in **English** (`values/strings.xml`) and **Spanish** (`values-es/strings.xml`).
+
+## Author & Credits
+
+- **Developed by**: Lucas "puntero" Maza (with the aid and help of Gemini 4 Argon)
+- **GitHub**: https://github.com/punteroo
+- **Discord**: `puntero`
+- **Twitter / X**: `desacierto_`
+- **Open Source Repository**: https://github.com/punteroo/focus-mesh-wear
 
 ## Documentation Index
 
