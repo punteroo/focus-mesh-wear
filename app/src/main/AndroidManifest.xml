@@ -17,7 +17,9 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
 
@@ -57,7 +59,7 @@
         <service
             android:name=".service.FocusTimerComplicationService"
             android:exported="true"
-            android:icon="@android:drawable/ic_lock_idle_alarm"
+            android:icon="@drawable/ic_launcher_monochrome"
             android:label="@string/complication_provider_label"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
