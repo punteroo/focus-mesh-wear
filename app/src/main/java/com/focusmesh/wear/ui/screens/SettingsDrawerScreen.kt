@@ -3,6 +3,7 @@ package com.focusmesh.wear.ui.screens
 import android.app.Activity
 import android.app.RemoteInput
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,6 +36,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +61,7 @@ import androidx.wear.compose.material.RadioButton
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Switch
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.TitleCard
 import androidx.wear.compose.material.ToggleChip
 import androidx.wear.compose.material.rememberPickerState
 import com.focusmesh.wear.R
@@ -83,6 +86,7 @@ private sealed interface SettingsSubScreen {
     data object FontSelector : SettingsSubScreen
     data object AlertModeSelector : SettingsSubScreen
     data object SoundSelector : SettingsSubScreen
+    data object About : SettingsSubScreen
 }
 
 // Native Wear OS configuration drawer using official Wear Compose Material primitives:
@@ -256,6 +260,10 @@ fun SettingsDrawerScreen(
                 selectedSound = preferences.soundOption,
                 onSelectSound = { onSelectSoundOption(it) }
             )
+            return
+        }
+        SettingsSubScreen.About -> {
+            NativeAboutScreen()
             return
         }
         null -> Unit
@@ -584,6 +592,173 @@ fun SettingsDrawerScreen(
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+
+            // Native Wear OS About screen entry.
+            item {
+                Chip(
+                    onClick = { activeSubScreen = SettingsSubScreen.About },
+                    label = { Text(text = stringResource(R.string.settings_about)) },
+                    secondaryLabel = {
+                        Text(
+                            text = stringResource(R.string.about_developer_line),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+// Native Wear OS About screen displaying developer credits, Gemini 4 Argon attribution,
+// social handles/links, and the open-source GitHub repository link.
+@Composable
+private fun NativeAboutScreen() {
+    val context = LocalContext.current
+    val listState = rememberScalingLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    val openUrl: (String) -> Unit = { url ->
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }
+    }
+
+    Scaffold(
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            state = listState,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    coroutineScope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+        ) {
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.about_header))
+                }
+            }
+
+            // Developer and Gemini 4 Argon credit card using native Wear OS TitleCard.
+            item {
+                TitleCard(
+                    onClick = { openUrl("https://github.com/punteroo") },
+                    title = {
+                        Text(
+                            text = stringResource(R.string.about_developer_line),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = stringResource(R.string.about_gemini_line),
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+            }
+
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.about_socials_header))
+                }
+            }
+
+            // GitHub: https://github.com/punteroo
+            item {
+                val githubUrl = stringResource(R.string.about_github_value)
+                Chip(
+                    onClick = { openUrl(githubUrl) },
+                    label = { Text(text = stringResource(R.string.about_github_label)) },
+                    secondaryLabel = {
+                        Text(
+                            text = githubUrl,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Discord: puntero
+            item {
+                Chip(
+                    onClick = {},
+                    label = { Text(text = stringResource(R.string.about_discord_label)) },
+                    secondaryLabel = {
+                        Text(
+                            text = stringResource(R.string.about_discord_value),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Twitter / X: desacierto_
+            item {
+                Chip(
+                    onClick = { openUrl("https://x.com/desacierto_") },
+                    label = { Text(text = stringResource(R.string.about_twitter_label)) },
+                    secondaryLabel = {
+                        Text(
+                            text = stringResource(R.string.about_twitter_value),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                ListHeader {
+                    Text(text = stringResource(R.string.about_repo_header))
+                }
+            }
+
+            // Open Source repository: https://github.com/punteroo/focus-mesh-wear
+            item {
+                val repoUrl = stringResource(R.string.about_repo_value)
+                TitleCard(
+                    onClick = { openUrl(repoUrl) },
+                    title = {
+                        Text(
+                            text = stringResource(R.string.about_repo_label),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = repoUrl,
+                        color = Color(0xFF38D6FF)
+                    )
+                }
             }
         }
     }

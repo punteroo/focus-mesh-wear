@@ -94,4 +94,20 @@
     <string name="tutorial_step_4_title">4. Modo Flexible</string>
     <string name="tutorial_step_4_body">Desliza arriba o abajo para alternar entre Modo Estandar y Flexible. Manten pulsado el reloj para cambiar de fase.</string>
     <string name="tutorial_done">Comenzar a Usar</string>
+
+    <!-- Native Wear OS About screen strings. -->
+    <string name="settings_about">Acerca de</string>
+    <string name="about_header">Acerca de FocusMesh</string>
+    <string name="about_developer_line">Developed by Lucas \"puntero\" Maza</string>
+    <string name="about_gemini_line">With the aid and help of Gemini 4 Argon</string>
+    <string name="about_socials_header">Redes y Enlaces</string>
+    <string name="about_github_label">GitHub</string>
+    <string name="about_github_value">https://github.com/punteroo</string>
+    <string name="about_discord_label">Discord</string>
+    <string name="about_discord_value">puntero</string>
+    <string name="about_twitter_label">Twitter / X</string>
+    <string name="about_twitter_value">desacierto_</string>
+    <string name="about_repo_header">Codigo Abierto</string>
+    <string name="about_repo_label">Repositorio Open Source</string>
+    <string name="about_repo_value">https://github.com/punteroo/focus-mesh-wear</string>
 </resources>
