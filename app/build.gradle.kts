@@ -1,4 +1,4 @@
-// Module build configuration targeting Wear OS 5 (API 34) for Samsung Galaxy Watch Ultra.
+// Module build configuration targeting API 35 for Google Play Store and Wear OS 5+ on Samsung Galaxy Watch Ultra.
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,15 +6,15 @@ plugins {
 
 android {
     namespace = "com.focusmesh.wear"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.focusmesh.wear"
-        // Minimum SDK 30 covers Wear OS 3+, while targetSdk 34 targets Wear OS 5 on Galaxy Watch Ultra.
+        // Minimum SDK 30 covers Wear OS 3+, while targetSdk 35 satisfies Google Play API 35 requirements.
         minSdk = 30
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     buildTypes {
